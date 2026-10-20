@@ -80,10 +80,17 @@ async function loadAuth() {
 }
 
 let recaptchaVerifier: { clear?: () => void } | null = null;
+let recaptchaHost: HTMLElement | null = null;
 
 export function resetRecaptcha() {
-  recaptchaVerifier?.clear?.();
+  try {
+    recaptchaVerifier?.clear?.();
+  } catch {
+    // The widget may already be gone with its host element.
+  }
   recaptchaVerifier = null;
+  recaptchaHost?.remove();
+  recaptchaHost = null;
 }
 
 /* --------------------------------------------------------------- public API */
@@ -159,8 +166,13 @@ export async function requestOtp(phoneInput: string, recaptchaContainerId: strin
   resetRecaptcha();
   const container = document.getElementById(recaptchaContainerId);
   if (!container) throw new Error("reCAPTCHA container is missing from the page.");
+  // reCAPTCHA can only render once per element, so every request gets a fresh host.
+  container.replaceChildren();
+  const host = document.createElement("div");
+  container.appendChild(host);
+  recaptchaHost = host;
   try {
-    const verifier = new mod.RecaptchaVerifier(auth, recaptchaContainerId, { size: "invisible" });
+    const verifier = new mod.RecaptchaVerifier(auth, host, { size: "invisible" });
     recaptchaVerifier = verifier;
     const confirmation = await mod.signInWithPhoneNumber(auth, phone, verifier);
     pendingConfirmation = confirmation;
