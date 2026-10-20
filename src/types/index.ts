@@ -160,9 +160,29 @@ export type WalletTxType =
   | "refund"
   | "adjustment"
   | "reward_credit"
-  | "spin_purchase";
+  | "spin_purchase"
+  | "transfer_out"
+  | "transfer_in";
 
 export type WalletTxDirection = "credit" | "debit";
+
+/** A customer-to-customer wallet transfer; both ledger entries share its id as `refId`. */
+export interface WalletTransfer {
+  id: string;
+  fromUid: string;
+  fromName: string;
+  fromPhone: string;
+  toUid: string;
+  toName: string;
+  toPhone: string;
+  amountPaise: number;
+  note?: string;
+  status: "completed";
+  fromBalanceAfterPaise: number;
+  toBalanceAfterPaise: number;
+  requestId: string;
+  createdAt: ISODate;
+}
 
 export interface WalletTransaction {
   id: string;

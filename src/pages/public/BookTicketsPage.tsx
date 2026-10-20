@@ -7,7 +7,7 @@ import {
   Ticket as TicketIcon,
   Wallet,
 } from "lucide-react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAsync } from "@/hooks/useAsync";
 import { useDebounced } from "@/hooks/useCollection";
 import { useAuth } from "@/app/AuthProvider";
@@ -48,11 +48,40 @@ import { newId } from "@/utils/id";
 type Filter = "all" | "available" | "mine" | "recent";
 
 const PAGE_SIZE = 120;
+const PENDING_BOOKING_KEY = "dd:pending-booking";
+
+export interface LowBalanceState {
+  shortfallPaise: number;
+  tickets: number;
+  returnTo: string;
+}
+
+function savePendingBooking(drawId: string, tickets: Ticket[]) {
+  try {
+    sessionStorage.setItem(PENDING_BOOKING_KEY, JSON.stringify({ drawId, tickets }));
+  } catch {
+    /* Storage can be unavailable (private mode); the customer simply re-selects. */
+  }
+}
+
+function takePendingBooking(drawId: string): Ticket[] {
+  try {
+    const raw = sessionStorage.getItem(PENDING_BOOKING_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as { drawId?: string; tickets?: Ticket[] };
+    if (parsed.drawId !== drawId || !Array.isArray(parsed.tickets)) return [];
+    sessionStorage.removeItem(PENDING_BOOKING_KEY);
+    return parsed.tickets;
+  } catch {
+    return [];
+  }
+}
 
 export function BookTicketsPage() {
   const { user, profile } = useAuth();
   const settings = useSiteSettings();
   const toast = useToast();
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
 
   const draws = useAsync(() => drawService.listPublic(50), []);
@@ -103,9 +132,10 @@ export function BookTicketsPage() {
     { enabled: Boolean(user) },
   );
 
-  /* Selection belongs to one draw only. */
+  /* Selection belongs to one draw only; a selection parked while adding money is restored. */
   useEffect(() => {
-    setSelected(new Map());
+    const restored = selectedDrawId ? takePendingBooking(selectedDrawId) : [];
+    setSelected(new Map(restored.map((ticket) => [ticket.id, ticket])));
     setQuery("");
     setSearchResults([]);
   }, [selectedDrawId]);
@@ -243,8 +273,23 @@ export function BookTicketsPage() {
   const balanceKnown = Boolean(wallet.data) && !wallet.error;
   const shortfall = balanceKnown ? Math.max(0, totalPaise - balance) : 0;
 
+  const goAddMoney = (shortfallPaise: number) => {
+    if (!draw) return;
+    savePendingBooking(draw.id, Array.from(selected.values()));
+    const state: LowBalanceState = {
+      shortfallPaise,
+      tickets: selected.size,
+      returnTo: `/book?draw=${encodeURIComponent(draw.id)}`,
+    };
+    navigate("/dashboard/add-money", { state });
+  };
+
   const openConfirm = () => {
     if (!draw) return;
+    if (shortfall > 0) {
+      goAddMoney(shortfall);
+      return;
+    }
     setPurchaseError(null);
     requestId.current = newId("buy");
     setConfirmOpen(true);
@@ -270,6 +315,11 @@ export function BookTicketsPage() {
       toast.success("Tickets confirmed", `${result.ticketNumbers.length} number(s) are now yours.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "The purchase could not be completed.";
+      if (message.startsWith("Insufficient wallet balance")) {
+        setConfirmOpen(false);
+        goAddMoney(Math.max(0, totalPaise - balance));
+        return;
+      }
       setPurchaseError(message);
       setRefreshKey((n) => n + 1);
     } finally {
@@ -582,10 +632,8 @@ export function BookTicketsPage() {
 
                   {shortfall > 0 && selected.size > 0 ? (
                     <Alert tone="warning" title="Not enough wallet balance">
-                      Add {formatINR(shortfall)} to complete this order.{" "}
-                      <Link to="/dashboard/add-money" className="font-semibold text-brand hover:underline">
-                        Add money
-                      </Link>
+                      Add {formatINR(shortfall)} to complete this order. The button below takes you to Add
+                      money and keeps your selected numbers.
                     </Alert>
                   ) : null}
 
@@ -595,6 +643,16 @@ export function BookTicketsPage() {
                         Sign in to continue
                       </Button>
                     </Link>
+                  ) : canPurchase && selected.size > 0 && shortfall > 0 ? (
+                    <Button
+                      block
+                      size="lg"
+                      variant="gold"
+                      onClick={() => goAddMoney(shortfall)}
+                      iconLeft={<Wallet className="size-4" aria-hidden />}
+                    >
+                      Add {formatINR(shortfall)} to continue
+                    </Button>
                   ) : (
                     <Button
                       block

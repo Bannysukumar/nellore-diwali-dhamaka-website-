@@ -47,6 +47,9 @@ const WalletPage = lazy(() =>
 const AddMoneyPage = lazy(() =>
   import("@/pages/dashboard/AddMoneyPage").then((m) => ({ default: m.AddMoneyPage })),
 );
+const SendMoneyPage = lazy(() =>
+  import("@/pages/dashboard/SendMoneyPage").then((m) => ({ default: m.SendMoneyPage })),
+);
 const MyTicketsPage = lazy(() =>
   import("@/pages/dashboard/MyTicketsPage").then((m) => ({ default: m.MyTicketsPage })),
 );
@@ -100,6 +103,9 @@ const AdminDepositsPage = lazy(() =>
 );
 const AdminLedgerPage = lazy(() =>
   import("@/pages/admin/LedgerPage").then((m) => ({ default: m.AdminLedgerPage })),
+);
+const AdminTransfersPage = lazy(() =>
+  import("@/pages/admin/TransfersPage").then((m) => ({ default: m.AdminTransfersPage })),
 );
 const AdminPaymentQrPage = lazy(() =>
   import("@/pages/admin/PaymentQrPage").then((m) => ({ default: m.AdminPaymentQrPage })),
@@ -175,6 +181,7 @@ export function App() {
                       <Route index element={<DashboardOverviewPage />} />
                       <Route path="wallet" element={<WalletPage />} />
                       <Route path="add-money" element={<AddMoneyPage />} />
+                      <Route path="send-money" element={<SendMoneyPage />} />
                       <Route path="tickets" element={<MyTicketsPage />} />
                       <Route path="tickets/:ticketId" element={<TicketDetailPage />} />
                       <Route path="referrals" element={<ReferralsPage />} />
@@ -198,6 +205,7 @@ export function App() {
                     <Route path="orders" element={<AdminOrdersPage />} />
                     <Route path="deposits" element={<AdminDepositsPage />} />
                     <Route path="ledger" element={<AdminLedgerPage />} />
+                    <Route path="transfers" element={<AdminTransfersPage />} />
                     <Route path="payment-qr" element={<AdminPaymentQrPage />} />
                     <Route path="customers" element={<AdminCustomersPage />} />
                     <Route path="referrals" element={<AdminReferralsPage />} />

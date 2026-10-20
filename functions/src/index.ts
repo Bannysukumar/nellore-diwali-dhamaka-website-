@@ -17,6 +17,7 @@ export { executeSpin } from "./spin.js";
 export { runDraw, publishDrawResults, cancelDraw, moderateWinner } from "./draws.js";
 export { setAdminClaim, logAdminAction, broadcastAnnouncement, startViewAs } from "./admin.js";
 export { adjustWallet } from "./wallet.js";
+export { findTransferRecipient, transferFunds } from "./transfers.js";
 
 /* --------------------------------------------------------------- scheduled  */
 export {

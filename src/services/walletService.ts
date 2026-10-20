@@ -1,4 +1,11 @@
-import type { DepositRequest, DepositStatus, PaymentQrCode, WalletAccount, WalletTransaction } from "@/types";
+import type {
+  DepositRequest,
+  DepositStatus,
+  PaymentQrCode,
+  WalletAccount,
+  WalletTransaction,
+  WalletTransfer,
+} from "@/types";
 import { store } from "@/lib/backend";
 
 export const walletService = {
@@ -29,6 +36,14 @@ export const walletService = {
   async transactions(uid: string, limit = 100): Promise<WalletTransaction[]> {
     return store.list<WalletTransaction>("walletTransactions", {
       where: [{ field: "uid", op: "==", value: uid }],
+      orderBy: [{ field: "createdAt", dir: "desc" }],
+      limit,
+    });
+  },
+
+  /** Every customer-to-customer transfer, newest first (admins only). */
+  async allTransfers(limit = 500): Promise<WalletTransfer[]> {
+    return store.list<WalletTransfer>("walletTransfers", {
       orderBy: [{ field: "createdAt", dir: "desc" }],
       limit,
     });

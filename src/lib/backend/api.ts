@@ -254,6 +254,31 @@ export interface StartViewAsRequest {
   uid: string;
 }
 
+export interface FindTransferRecipientRequest {
+  phone: string;
+}
+
+export interface FindTransferRecipientResponse {
+  maskedName: string;
+  phoneMasked: string;
+}
+
+export interface TransferFundsRequest {
+  /** Idempotency key: a retried request is applied at most once. */
+  requestId: string;
+  toPhone: string;
+  amountPaise: number;
+  note?: string;
+}
+
+export interface TransferFundsResponse {
+  transferId: string;
+  amountPaise: number;
+  balancePaise: number;
+  recipientName: string;
+  createdAt: string;
+}
+
 /** A custom token for a read-only session as the customer. */
 export interface StartViewAsResponse {
   token: string;

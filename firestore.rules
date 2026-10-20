@@ -208,6 +208,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Customer-to-customer transfers, written only by `transferFunds`.
+    match /walletTransfers/{transferId} {
+      allow read: if isAdmin()
+        || (signedIn() && (uid() == resource.data.fromUid || uid() == resource.data.toUid));
+      allow write: if false;
+    }
+
     match /orders/{orderId} {
       allow read: if isAdmin() || (signedIn() && uid() == resource.data.uid);
       allow write: if false;

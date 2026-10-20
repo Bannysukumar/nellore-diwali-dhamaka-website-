@@ -189,6 +189,19 @@ describe("money and outcomes are server-only", () => {
     await assertSucceeds(customer().doc("referrals/bob_alice").get());
     await assertFails(env.authenticatedContext("carol").firestore().doc("referrals/bob_alice").get());
   });
+
+  it("shows a transfer only to its sender, its recipient and admins, and nobody writes one", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc("walletTransfers/t1").set({ fromUid: "alice", toUid: "dave", amountPaise: 500 });
+    });
+    await assertSucceeds(customer().doc("walletTransfers/t1").get());
+    await assertSucceeds(env.authenticatedContext("dave").firestore().doc("walletTransfers/t1").get());
+    await assertFails(env.authenticatedContext("carol").firestore().doc("walletTransfers/t1").get());
+    await assertSucceeds(admin().collection("walletTransfers").get());
+    await assertFails(customer().collection("walletTransfers").get());
+    await assertFails(customer().doc("walletTransfers/t2").set({ fromUid: "alice", toUid: "dave", amountPaise: 1 }));
+    await assertFails(admin().doc("walletTransfers/t1").update({ amountPaise: 1 }));
+  });
 });
 
 describe("draws", () => {

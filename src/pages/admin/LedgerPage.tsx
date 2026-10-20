@@ -32,6 +32,8 @@ const TYPE_LABEL: Record<WalletTxType, string> = {
   adjustment: "Adjustment",
   reward_credit: "Reward credit",
   spin_purchase: "Spin purchase",
+  transfer_out: "Transfer sent",
+  transfer_in: "Transfer received",
 };
 
 export function AdminLedgerPage() {
@@ -194,6 +196,8 @@ export function AdminLedgerPage() {
             { value: "refund", label: "Refunds" },
             { value: "reward_credit", label: "Rewards" },
             { value: "spin_purchase", label: "Spins" },
+            { value: "transfer_out", label: "Transfers sent" },
+            { value: "transfer_in", label: "Transfers received" },
             { value: "adjustment", label: "Adjustments" },
           ]}
           value={filter}

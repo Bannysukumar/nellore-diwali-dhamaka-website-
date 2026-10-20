@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
+  ArrowLeftRight,
   BadgePercent,
   Bell,
   BookOpen,
@@ -56,6 +57,7 @@ const LINKS: NavItem[] = [
   { to: "/admin/customers", label: "Customers", icon: Users, group: "People" },
   { to: "/admin/referrals", label: "Referrals", icon: Users, group: "People" },
   { to: "/admin/ledger", label: "Wallet ledger", icon: ScrollText, group: "Money" },
+  { to: "/admin/transfers", label: "Wallet transfers", icon: ArrowLeftRight, group: "Money" },
   { to: "/admin/payment-qr", label: "Payment QR codes", icon: QrCode, group: "Money" },
   { to: "/admin/reports", label: "Reports", icon: BadgePercent, group: "Money" },
   { to: "/admin/banners", label: "Banners", icon: Images, group: "Content" },

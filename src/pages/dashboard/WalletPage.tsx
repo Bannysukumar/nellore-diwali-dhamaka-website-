@@ -1,4 +1,4 @@
-import { Plus, Wallet } from "lucide-react";
+import { Plus, Send, Wallet } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAsync } from "@/hooks/useAsync";
 import { useAuth } from "@/app/AuthProvider";
@@ -166,9 +166,16 @@ export function WalletPage() {
           { label: "Wallet" },
         ]}
         actions={
-          <Link to="/dashboard/add-money">
-            <Button iconLeft={<Plus className="size-4" aria-hidden />}>Add money</Button>
-          </Link>
+          <>
+            <Link to="/dashboard/send-money">
+              <Button variant="outline" iconLeft={<Send className="size-4" aria-hidden />}>
+                Send money
+              </Button>
+            </Link>
+            <Link to="/dashboard/add-money">
+              <Button iconLeft={<Plus className="size-4" aria-hidden />}>Add money</Button>
+            </Link>
+          </>
         }
       />
 

@@ -6,7 +6,7 @@ import {
   ShieldCheck,
   Upload,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useAsync } from "@/hooks/useAsync";
 import { useAuth } from "@/app/AuthProvider";
 import { useSettings, useSiteSettings } from "@/app/SettingsProvider";
@@ -33,6 +33,7 @@ import {
 import { PageHeader } from "@/components/layout/PageHeader";
 import { formatINR, parseRupeesToPaise, paiseToRupees } from "@/utils/money";
 import { newId } from "@/utils/id";
+import type { LowBalanceState } from "@/pages/public/BookTicketsPage";
 
 const PRESETS = [20000, 50000, 100000, 200000, 500000];
 
@@ -43,6 +44,9 @@ export function AddMoneyPage() {
   const settings = useSiteSettings();
   const { settings: rawSettings } = useSettings();
   const toast = useToast();
+  const location = useLocation();
+  const lowBalance = (location.state as LowBalanceState | null) ?? null;
+  const prefilled = useRef(false);
 
   const [step, setStep] = useState<Step>("amount");
   const [amountInput, setAmountInput] = useState("");
@@ -73,6 +77,14 @@ export function AddMoneyPage() {
     Number.isFinite(amountPaise) &&
     amountPaise >= settings.minDepositPaise &&
     amountPaise <= settings.maxDepositPaise;
+
+  useEffect(() => {
+    if (prefilled.current || !lowBalance?.shortfallPaise || !depositsConfigured) return;
+    prefilled.current = true;
+    const wholeRupees = Math.ceil(lowBalance.shortfallPaise / 100) * 100;
+    const suggested = Math.min(Math.max(wholeRupees, settings.minDepositPaise), settings.maxDepositPaise);
+    setAmountInput((current) => current || String(paiseToRupees(suggested)));
+  }, [lowBalance, depositsConfigured, settings.minDepositPaise, settings.maxDepositPaise]);
 
   useEffect(() => {
     if (!file) {
@@ -219,6 +231,21 @@ export function AddMoneyPage() {
           <Alert tone="warning" className="mb-4" title="Deposits are not available yet">
             The organiser has not published deposit limits. Adding money will open once the site
             settings are configured.
+          </Alert>
+        ) : null}
+
+        {lowBalance && step !== "done" ? (
+          <Alert tone="warning" className="mb-4" title="Not enough balance to book your tickets">
+            {lowBalance.shortfallPaise > 0
+              ? `You need ${formatINR(lowBalance.shortfallPaise)} more in your wallet to book ${lowBalance.tickets} ticket${
+                  lowBalance.tickets === 1 ? "" : "s"
+                }.`
+              : "Your wallet balance is too low for this order."}{" "}
+            Add money below. Your wallet is credited once an administrator verifies the payment, and then you
+            can finish booking. Numbers are not reserved until you pay for them.{" "}
+            <Link to={lowBalance.returnTo} className="font-semibold text-brand hover:underline">
+              Back to booking
+            </Link>
           </Alert>
         ) : null}
 
@@ -445,6 +472,11 @@ export function AddMoneyPage() {
                     <Link to="/dashboard/wallet">
                       <Button>View deposit status</Button>
                     </Link>
+                    {lowBalance ? (
+                      <Link to={lowBalance.returnTo}>
+                        <Button variant="outline">Back to booking</Button>
+                      </Link>
+                    ) : null}
                     <Button variant="outline" onClick={reset}>
                       Add another deposit
                     </Button>

@@ -80,6 +80,8 @@ export const BACKEND_FUNCTIONS = [
   "broadcastAnnouncement",
   "adjustWallet",
   "startViewAs",
+  "findTransferRecipient",
+  "transferFunds",
 ] as const;
 
 export type BackendFunctionName = (typeof BACKEND_FUNCTIONS)[number];

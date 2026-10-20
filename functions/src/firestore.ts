@@ -64,6 +64,7 @@ export const COLLECTIONS = {
   creditedUtrs: "creditedUtrs",
   /** One document per admin balance adjustment (id from requestId); server-only. */
   walletAdjustments: "walletAdjustments",
+  walletTransfers: "walletTransfers",
 } as const;
 
 /** Firestore rejects `undefined`; strip it so optional fields stay optional. */
