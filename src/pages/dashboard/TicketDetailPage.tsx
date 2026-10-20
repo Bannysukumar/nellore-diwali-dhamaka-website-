@@ -351,7 +351,7 @@ export function TicketDetailPage() {
           </Card>
         </div>
 
-        <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+        <div className="side-panel space-y-4">
           <Card>
             <CardHeader title="Draw" action={draw.data ? <DrawStatusBadge status={draw.data.status} /> : null} />
             <CardBody className="space-y-3">

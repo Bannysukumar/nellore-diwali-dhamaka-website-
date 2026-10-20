@@ -333,7 +333,7 @@ export function SpinPage() {
           </Card>
         </div>
 
-        <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+        <div className="side-panel space-y-4">
           <Card>
             <CardHeader icon={Info} title="What can I win?" />
             <CardBody className="space-y-2.5">

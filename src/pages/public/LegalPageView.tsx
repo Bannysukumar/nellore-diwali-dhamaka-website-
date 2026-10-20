@@ -195,7 +195,7 @@ export function LegalPageView() {
           </CardBody>
         </Card>
 
-        <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+        <div className="side-panel space-y-4">
           <Card>
             <CardHeader title="All published policies" />
             <CardBody className="flex flex-col gap-2">

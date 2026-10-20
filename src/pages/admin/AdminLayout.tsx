@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   BadgePercent,
@@ -27,6 +27,8 @@ import { useAuth } from "@/app/AuthProvider";
 import { useSiteSettings } from "@/app/SettingsProvider";
 import { walletService } from "@/services/walletService";
 import { useAsync } from "@/hooks/useAsync";
+import { useMobileMenu } from "@/hooks/useMobileMenu";
+import { ScrollToTop } from "@/components/layout/PublicLayout";
 import { IS_EMULATOR, EMULATOR_NOTICE } from "@/lib/firebase/config";
 import { Badge, Button } from "@/components/ui";
 import { Logo } from "@/components/brand/Logo";
@@ -68,7 +70,7 @@ export function AdminLayout() {
   const { profile, signOut } = useAuth();
   const settings = useSiteSettings();
   const location = useLocation();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const menu = useMobileMenu();
 
   const pending = useAsync(() => walletService.pendingDepositTotal(), [location.pathname]);
 
@@ -98,7 +100,7 @@ export function AdminLayout() {
                 <NavLink
                   to={item.to}
                   end={item.end}
-                  onClick={() => setMenuOpen(false)}
+                  onClick={menu.close}
                   className={({ isActive }) =>
                     cn(
                       "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition",
@@ -122,8 +124,23 @@ export function AdminLayout() {
     </nav>
   );
 
+  const pendingCard = (
+    <div className="rounded-[var(--radius-card)] border border-line bg-paper p-4 shadow-[var(--shadow-card)]">
+      <p className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted">Pending deposits</p>
+      <p className="mt-1 font-display text-[22px] font-bold tabular-nums text-status-pending">
+        {pending.error ? "—" : pending.data ? pending.data.count : "…"}
+      </p>
+      <p className="text-[12px] text-muted">
+        {pending.error
+          ? "Could not load pending deposits"
+          : `${formatINRCompact(pending.data?.amountPaise)} awaiting review`}
+      </p>
+    </div>
+  );
+
   return (
     <div className="min-h-dvh bg-ivory">
+      <ScrollToTop />
       {IS_EMULATOR ? (
         <div className="bg-maroon-deep text-[11px] font-semibold uppercase tracking-[0.14em] text-gold-soft">
           <p className="page py-1.5 text-center">Admin · {EMULATOR_NOTICE}</p>
@@ -135,12 +152,13 @@ export function AdminLayout() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => setMenuOpen((v) => !v)}
-              aria-expanded={menuOpen}
-              aria-label={menuOpen ? "Close admin menu" : "Open admin menu"}
+              onClick={menu.toggle}
+              aria-expanded={menu.open}
+              aria-controls="admin-mobile-menu"
+              aria-label={menu.open ? "Close admin menu" : "Open admin menu"}
               className="grid size-10 place-items-center rounded-xl border border-line bg-paper text-ink lg:hidden"
             >
-              {menuOpen ? <X className="size-5" aria-hidden /> : <Menu className="size-5" aria-hidden />}
+              {menu.open ? <X className="size-5" aria-hidden /> : <Menu className="size-5" aria-hidden />}
             </button>
             <Logo />
             <Badge tone="brand" className="hidden sm:inline-flex">
@@ -181,31 +199,45 @@ export function AdminLayout() {
         </div>
       </header>
 
-      <div className="page grid gap-6 py-6 lg:grid-cols-[248px_1fr]">
-        <aside className="hidden lg:block">
-          <div className="sticky top-24 space-y-4">
-            <div className="rounded-[var(--radius-card)] border border-line bg-paper p-4 shadow-[var(--shadow-card)]">
-              <p className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted">
-                Pending deposits
-              </p>
-              <p className="mt-1 font-display text-[22px] font-bold tabular-nums text-status-pending">
-                {pending.error ? "—" : pending.data ? pending.data.count : "…"}
-              </p>
-              <p className="text-[12px] text-muted">
-                {pending.error
-                  ? "Could not load pending deposits"
-                  : `${formatINRCompact(pending.data?.amountPaise)} awaiting review`}
-              </p>
+      {menu.open ? (
+        <div id="admin-mobile-menu" className="fixed inset-x-0 bottom-0 top-16 z-40 lg:hidden">
+          <button
+            type="button"
+            aria-label="Close admin menu"
+            className="absolute inset-0 bg-ink/30 backdrop-blur-[1px]"
+            onClick={menu.close}
+          />
+          <div className="relative max-h-full overflow-y-auto overscroll-contain border-b border-line bg-paper shadow-[var(--shadow-card)]">
+            <div className="page space-y-4 py-4">
+              {pendingCard}
+              {sidebar}
+              <div className="grid grid-cols-2 gap-2 border-t border-line pt-3 sm:hidden">
+                <NavLink
+                  to="/"
+                  className="inline-flex items-center justify-center rounded-xl border border-line bg-paper px-3 py-2.5 text-[13px] font-semibold text-ink"
+                >
+                  View site
+                </NavLink>
+                <Button
+                  variant="ghost"
+                  onClick={() => void signOut()}
+                  iconLeft={<LogOut className="size-4" aria-hidden />}
+                >
+                  Sign out
+                </Button>
+              </div>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="page grid grid-cols-[minmax(0,1fr)] gap-6 py-6 lg:grid-cols-[248px_minmax(0,1fr)]">
+        <aside className="hidden lg:block">
+          <div className="sticky top-20 max-h-[calc(100dvh-6rem)] space-y-4 overflow-y-auto overscroll-contain pb-2 pr-1">
+            {pendingCard}
             {sidebar}
           </div>
         </aside>
-
-        {menuOpen ? (
-          <div className="rounded-[var(--radius-card)] border border-line bg-paper p-4 lg:hidden">
-            {sidebar}
-          </div>
-        ) : null}
 
         <main className="min-w-0">
           <Outlet />

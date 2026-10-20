@@ -184,7 +184,7 @@ export function ProfilePage() {
           </Card>
         </div>
 
-        <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+        <div className="side-panel space-y-4">
           <Card>
             <CardBody className="space-y-3 text-center">
               <span className="mx-auto grid size-16 place-items-center rounded-full bg-brand text-[22px] font-bold text-white">

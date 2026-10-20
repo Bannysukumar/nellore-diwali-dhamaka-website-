@@ -1,5 +1,5 @@
 import { Home, Ticket, Trophy, User, Wallet } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/app/AuthProvider";
 import { cn } from "@/utils/cn";
 
@@ -17,6 +17,10 @@ const items = [
  */
 export function BottomNav() {
   const { user } = useAuth();
+  const { pathname } = useLocation();
+  /** Wallet has its own tab, so it must not also light up Account. */
+  const overrideActive = (to: string): boolean | null =>
+    to === "/dashboard" ? pathname.startsWith("/dashboard") && !pathname.startsWith("/dashboard/wallet") : null;
   return (
     <nav
       aria-label="Primary mobile"
@@ -31,7 +35,7 @@ export function BottomNav() {
               className={({ isActive }) =>
                 cn(
                   "flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-[10.5px] font-semibold transition",
-                  isActive ? "text-brand" : "text-muted",
+                  (overrideActive(to) ?? isActive) ? "text-brand" : "text-muted",
                 )
               }
             >
@@ -40,7 +44,7 @@ export function BottomNav() {
                   <span
                     className={cn(
                       "grid size-8 place-items-center rounded-full transition",
-                      isActive ? "bg-brand/10" : "",
+                      (overrideActive(to) ?? isActive) ? "bg-brand/10" : "",
                     )}
                   >
                     <Icon className="size-[18px]" aria-hidden />

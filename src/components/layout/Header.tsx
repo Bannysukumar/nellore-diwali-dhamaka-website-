@@ -1,9 +1,9 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { LogOut, Menu, ShieldCheck, User, Wallet, X } from "lucide-react";
-import { useState } from "react";
-import { Link, NavLink, useLocation } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "@/app/AuthProvider";
 import { useSettings } from "@/app/SettingsProvider";
+import { useMobileMenu } from "@/hooks/useMobileMenu";
 import { IS_EMULATOR, EMULATOR_NOTICE } from "@/lib/firebase/config";
 import { Button } from "@/components/ui";
 import { Logo } from "@/components/brand/Logo";
@@ -22,8 +22,7 @@ const NAV = [
 export function Header() {
   const { user, profile, isAdmin, signOut } = useAuth();
   const { error: settingsError, reload: reloadSettings } = useSettings();
-  const [open, setOpen] = useState(false);
-  const location = useLocation();
+  const { open, setOpen, toggle } = useMobileMenu();
 
   return (
     <>
@@ -113,8 +112,9 @@ export function Header() {
 
             <button
               type="button"
-              onClick={() => setOpen((v) => !v)}
+              onClick={toggle}
               aria-expanded={open}
+              aria-controls="site-mobile-menu"
               aria-label={open ? "Close menu" : "Open menu"}
               className="grid size-10 place-items-center rounded-xl border border-line bg-paper text-ink transition hover:border-gold lg:hidden"
             >
@@ -126,11 +126,12 @@ export function Header() {
         <AnimatePresence>
           {open ? (
             <motion.div
+              id="site-mobile-menu"
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-              className="overflow-hidden border-t border-line bg-paper lg:hidden"
+              className="max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-line bg-paper lg:hidden"
             >
               <nav aria-label="Mobile" className="page grid gap-1 py-3">
                 {NAV.map((item) => (
@@ -195,9 +196,6 @@ export function Header() {
           ) : null}
         </AnimatePresence>
       </header>
-
-      {/* Keeps route changes from leaving the mobile menu open. */}
-      <span className="hidden" data-route={location.pathname} />
     </>
   );
 }

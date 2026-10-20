@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   Bell,
@@ -57,9 +57,18 @@ export function DashboardLayout() {
     [notifications.data],
   );
 
+  // On phones the section links are a swipeable strip; keep the current one in view.
+  const strip = useRef<HTMLUListElement>(null);
+  useEffect(() => {
+    const list = strip.current;
+    const active = list?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!list || !active || list.scrollWidth <= list.clientWidth) return;
+    list.scrollTo({ left: active.offsetLeft - (list.clientWidth - active.offsetWidth) / 2, behavior: "smooth" });
+  }, [location.pathname]);
+
   return (
-    <div className="page grid gap-6 py-6 lg:grid-cols-[240px_1fr]">
-      <aside className="lg:sticky lg:top-24 lg:self-start">
+    <div className="page grid grid-cols-[minmax(0,1fr)] gap-6 py-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+      <aside className="min-w-0 lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:self-start lg:overflow-y-auto lg:overscroll-contain lg:pb-2 lg:pr-1">
         <div className="rounded-[var(--radius-card)] border border-line bg-paper p-4 shadow-[var(--shadow-card)]">
           <div className="flex items-center gap-3">
             <span className="grid size-11 shrink-0 place-items-center rounded-full bg-brand text-[15px] font-bold text-white">
@@ -95,7 +104,10 @@ export function DashboardLayout() {
         </div>
 
         <nav aria-label="Account sections" className="mt-3">
-          <ul className="flex gap-1.5 overflow-x-auto rounded-[var(--radius-card)] border border-line bg-paper p-2 lg:flex-col lg:gap-1 lg:overflow-visible">
+          <ul
+            ref={strip}
+            className="no-scrollbar relative flex gap-1.5 overflow-x-auto overscroll-x-contain rounded-[var(--radius-card)] border border-line bg-paper p-2 lg:flex-col lg:gap-1 lg:overflow-visible"
+          >
             {LINKS.map((item) => (
               <li key={item.to} className="shrink-0 lg:shrink">
                 <NavLink

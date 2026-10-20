@@ -213,7 +213,7 @@ export function ReferralsPage() {
           </CardBody>
         </Card>
 
-        <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+        <div className="side-panel space-y-4">
           <Card className="gradient-reward text-ivory">
             <CardBody className="space-y-3">
               <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-gold-soft">
