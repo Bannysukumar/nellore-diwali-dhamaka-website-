@@ -28,6 +28,7 @@ import {
 } from "@/components/ui";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SpinWheel } from "@/features/spin/SpinWheel";
+import { ReferralLinkCard } from "@/features/referrals/ReferralLinkCard";
 import { formatDateTime } from "@/utils/format";
 import { formatINR } from "@/utils/money";
 import { newId } from "@/utils/id";
@@ -165,14 +166,9 @@ export function SpinPage() {
           { label: "Dashboard", to: "/dashboard" },
           { label: "Spin wheel" },
         ]}
-        actions={
-          <Link to="/dashboard/referrals">
-            <Button variant="outline" iconLeft={<Users className="size-4" aria-hidden />}>
-              Earn more spins
-            </Button>
-          </Link>
-        }
       />
+
+      <ReferralLinkCard className="mt-5 lg:hidden" />
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
@@ -188,6 +184,7 @@ export function SpinPage() {
           hint={spinPricePaise > 0 ? `${formatINR(spinPricePaise)} per paid spin` : "Paid spins are off"}
           icon={Wallet}
           tone="emerald"
+          to="/dashboard/add-money"
         />
         <StatCard label="Spins used" value={spinAccount?.totalUsed ?? 0} hint="All time" />
         <StatCard
@@ -286,7 +283,7 @@ export function SpinPage() {
               {spinPricePaise > 0 && !wallet.loading && balancePaise < spinPricePaise ? (
                 <p className="max-w-sm text-center text-[12px] leading-relaxed text-muted">
                   A paid spin costs {formatINR(spinPricePaise)} and your wallet has {formatINR(balancePaise)}.{" "}
-                  <Link to="/dashboard/wallet" className="font-semibold text-brand hover:underline">
+                  <Link to="/dashboard/add-money" className="font-semibold text-brand hover:underline">
                     Add money
                   </Link>{" "}
                   to spin.
@@ -334,6 +331,8 @@ export function SpinPage() {
         </div>
 
         <div className="side-panel space-y-4">
+          <ReferralLinkCard className="hidden lg:block" />
+
           <Card>
             <CardHeader icon={Info} title="What can I win?" />
             <CardBody className="space-y-2.5">

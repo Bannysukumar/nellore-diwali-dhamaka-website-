@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef } from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   Bell,
   ChevronRight,
   History,
   LifeBuoy,
   LayoutDashboard,
+  Plus,
   Send,
   ShoppingBag,
   Sparkles,
@@ -86,19 +87,29 @@ export function DashboardLayout() {
             </div>
           </div>
 
-          <div className="mt-3.5 rounded-xl border border-line bg-ivory/70 px-3 py-2.5">
-            <p className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">
-              Wallet balance
-            </p>
-            <p className="mt-0.5 font-display text-[20px] font-bold tabular-nums text-emerald">
-              {wallet.loading ? <Spinner /> : formatINR(wallet.data?.balancePaise)}
-            </p>
-            {wallet.data?.pendingDepositPaise ? (
-              <p className="mt-1 text-[11px] text-status-pending">
-                {formatINR(wallet.data.pendingDepositPaise)} awaiting verification
+          <Link
+            to="/dashboard/add-money"
+            aria-label="Wallet balance — add money"
+            className="mt-3.5 flex items-center justify-between gap-3 rounded-xl border border-line bg-ivory/70 px-3 py-2.5 transition hover:border-gold hover:bg-gold-soft/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron/50"
+          >
+            <div className="min-w-0">
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">
+                Wallet balance
               </p>
-            ) : null}
-          </div>
+              <p className="mt-0.5 font-display text-[20px] font-bold tabular-nums text-emerald">
+                {wallet.loading ? <Spinner /> : formatINR(wallet.data?.balancePaise)}
+              </p>
+              {wallet.data?.pendingDepositPaise ? (
+                <p className="mt-1 text-[11px] text-status-pending">
+                  {formatINR(wallet.data.pendingDepositPaise)} awaiting verification
+                </p>
+              ) : null}
+            </div>
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-emerald px-2.5 py-1.5 text-[12px] font-semibold text-white">
+              <Plus className="size-3.5" aria-hidden />
+              Add money
+            </span>
+          </Link>
 
           {!settings.allowPaidDraws ? (
             <p className="mt-3 rounded-lg border border-dashed border-gold bg-gold-soft/40 px-2.5 py-2 text-[11px] leading-relaxed text-gold-deep">

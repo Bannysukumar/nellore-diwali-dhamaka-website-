@@ -144,10 +144,11 @@ export function DashboardOverviewPage() {
           hint={
             wallet.data?.pendingDepositPaise
               ? `${formatINR(wallet.data.pendingDepositPaise)} pending verification`
-              : "Available for ticket purchases"
+              : "Tap to add money"
           }
           icon={Wallet}
           tone="emerald"
+          to="/dashboard/add-money"
         />
         <StatCard
           label="Tickets owned"

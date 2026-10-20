@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import type { HTMLAttributes, ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { cn } from "@/utils/cn";
 
 /* ------------------------------------------------------------------- Card */
@@ -123,6 +124,7 @@ export function StatCard({
   icon: Icon,
   tone = "default",
   className,
+  to,
 }: {
   label: string;
   value: ReactNode;
@@ -130,6 +132,8 @@ export function StatCard({
   icon?: LucideIcon;
   tone?: "default" | "brand" | "gold" | "emerald" | "warning";
   className?: string;
+  /** Makes the whole card a link. */
+  to?: string;
 }) {
   const tones: Record<string, string> = {
     default: "bg-ivory text-ink",
@@ -138,8 +142,8 @@ export function StatCard({
     emerald: "bg-emerald-soft text-emerald",
     warning: "bg-status-pending-bg text-status-pending",
   };
-  return (
-    <Card className={cn("p-4", className)}>
+  const card = (
+    <Card className={cn("p-4", to && "h-full hover:border-gold", className)} interactive={Boolean(to)}>
       <div className="flex items-start justify-between gap-3">
         <p className="text-[12px] font-medium uppercase tracking-[0.1em] text-muted">{label}</p>
         {Icon ? (
@@ -151,5 +155,12 @@ export function StatCard({
       <p className="mt-2 font-display text-[24px] leading-none text-ink">{value}</p>
       {hint ? <p className="mt-1.5 text-[12px] leading-snug text-muted">{hint}</p> : null}
     </Card>
+  );
+  return to ? (
+    <Link to={to} className="block rounded-[var(--radius-card)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron/50">
+      {card}
+    </Link>
+  ) : (
+    card
   );
 }
