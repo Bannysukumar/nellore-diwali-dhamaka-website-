@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Trash2,
   Wallet,
+  Zap,
 } from "lucide-react";
 import { useAsync } from "@/hooks/useAsync";
 import { useToast } from "@/app/ToastProvider";
@@ -78,7 +79,7 @@ function toDraft(settings: SiteSettings): SettingsDraft {
   };
 }
 
-type Section = "general" | "money" | "compliance" | "packages";
+type Section = "general" | "money" | "compliance" | "packages" | "speed";
 
 export function AdminSettingsPage() {
   const toast = useToast();
@@ -95,6 +96,9 @@ export function AdminSettingsPage() {
   const packages = useAsync(() => contentService.allPackages(), []);
   const [packageDraft, setPackageDraft] = useState<TicketPackage[]>([]);
   const [removingPackage, setRemovingPackage] = useState<TicketPackage | null>(null);
+
+  const performance = useAsync(() => contentService.performance(), []);
+  const [savingSpeed, setSavingSpeed] = useState(false);
 
   useEffect(() => {
     if (base && !draft) setDraft(toDraft(base));
@@ -207,6 +211,33 @@ export function AdminSettingsPage() {
     }
   };
 
+  const setKeepWarm = async (keepWarm: boolean) => {
+    setError(null);
+    setSavingSpeed(true);
+    try {
+      await contentService.setKeepWarm(keepWarm);
+      await adminService.log({
+        actorUid: profile?.uid ?? "",
+        actorName: profile?.fullName ?? "Administrator",
+        action: "settings.keepWarm",
+        entity: "siteSettings",
+        entityId: "performance",
+        note: `Keep customer actions fast ${keepWarm ? "ENABLED" : "disabled"}`,
+        before: { keepWarm: !keepWarm },
+        after: { keepWarm },
+      });
+      toast.success(
+        keepWarm ? "Fast mode on" : "Fast mode off",
+        keepWarm ? "Warm-up starts within 5 minutes." : "Warm-up stops within 5 minutes.",
+      );
+      performance.reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "The setting could not be saved.");
+    } finally {
+      setSavingSpeed(false);
+    }
+  };
+
   const addPackage = () => {
     setPackageDraft((currentPackages) => [
       ...currentPackages,
@@ -300,6 +331,7 @@ export function AdminSettingsPage() {
           { value: "money", label: "Money" },
           { value: "compliance", label: "Compliance" },
           { value: "packages", label: "Ticket packages" },
+          { value: "speed", label: "Speed" },
         ]}
         value={section}
         onChange={setSection}
@@ -692,6 +724,46 @@ export function AdminSettingsPage() {
               At checkout the server re-prices every ticket from the draw document. A package is only a
               convenient selection preset and can never discount or inflate what a customer actually pays.
             </Alert>
+          </CardBody>
+        </Card>
+      ) : null}
+
+      {section === "speed" ? (
+        <Card className="mt-4">
+          <CardHeader
+            icon={Zap}
+            title="Speed"
+            description="Keeps sign-in, ticket booking, spins, add money and send money quick during busy periods."
+          />
+          <CardBody className="space-y-4">
+            <LoadErrors sources={[performance]} />
+            {performance.loading ? (
+              <Skeleton className="h-20" rounded="lg" />
+            ) : (
+              <div
+                className={
+                  performance.data?.keepWarm
+                    ? "rounded-xl border border-emerald/40 bg-emerald/5 p-3"
+                    : "rounded-xl border border-line bg-ivory/50 p-3"
+                }
+              >
+                <Switch
+                  checked={performance.data?.keepWarm ?? false}
+                  disabled={savingSpeed || Boolean(performance.error)}
+                  onChange={(value) => void setKeepWarm(value)}
+                  label="Keep customer actions fast"
+                  description="Every 5 minutes the server wakes these actions up so the first customer after a quiet spell does not wait a few extra seconds. Saved immediately."
+                />
+              </div>
+            )}
+            <Alert tone="info" title="When to use it">
+              Turn it on for the festival sales period and off afterwards. The cost is a few rupees a month
+              at most, but there is no benefit when nobody is using the site. Very rarely a customer may
+              still see a short delay. The change is written to the audit log.
+            </Alert>
+            {performance.data?.updatedAt ? (
+              <p className="text-[12px] text-muted">Last changed {formatDateTime(performance.data.updatedAt)}</p>
+            ) : null}
           </CardBody>
         </Card>
       ) : null}

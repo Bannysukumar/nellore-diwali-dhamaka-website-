@@ -433,6 +433,13 @@ export interface Banner {
   updatedAt: ISODate;
 }
 
+/** `siteSettings/performance`. */
+export interface PerformanceSettings {
+  /** Ping the customer callables every few minutes so they rarely cold-start. */
+  keepWarm: boolean;
+  updatedAt?: ISODate;
+}
+
 export interface SplashConfig {
   enabled: boolean;
   desktopBannerUrl?: string;

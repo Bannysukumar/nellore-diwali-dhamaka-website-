@@ -1,8 +1,8 @@
 import { getAuth } from "firebase-admin/auth";
-import { onCall, type CallableRequest } from "firebase-functions/v2/https";
+import type { CallableRequest } from "firebase-functions/v2/https";
+import { hotCallable } from "./warm.js";
 import {
   COLLECTIONS,
-  HOT_CALLABLE_OPTIONS,
   InsufficientFundsError,
   applyLedger,
   clean,
@@ -90,8 +90,7 @@ export interface TransferRecipientResponse {
 }
 
 /** Lets the sender confirm who a number belongs to before sending money. */
-export const findTransferRecipient = onCall<unknown>(
-  HOT_CALLABLE_OPTIONS,
+export const findTransferRecipient = hotCallable(
   async (request): Promise<TransferRecipientResponse> => {
     const sender = await requireCustomerSender(request.auth);
     const data = requireObject<Record<string, unknown>>(request.data);
@@ -116,7 +115,7 @@ export interface TransferFundsResponse {
  * is never created, lost or half-moved. The transfer id derives from
  * `requestId`, so a retried request is applied at most once.
  */
-export const transferFunds = onCall<unknown>(HOT_CALLABLE_OPTIONS, async (request): Promise<TransferFundsResponse> => {
+export const transferFunds = hotCallable(async (request): Promise<TransferFundsResponse> => {
   const sender = await requireCustomerSender(request.auth);
   const data = requireObject<Record<string, unknown>>(request.data);
   const requestId = requireRequestId(data);

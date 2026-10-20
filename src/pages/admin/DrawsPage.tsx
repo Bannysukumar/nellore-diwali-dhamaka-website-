@@ -1,11 +1,14 @@
 import { useMemo, useState } from "react";
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   Coins,
   Dices,
   Plus,
   Send,
   Ticket as TicketIcon,
+  Trash2,
 } from "lucide-react";
 import { useAsync } from "@/hooks/useAsync";
 import { useToast } from "@/app/ToastProvider";
@@ -21,7 +24,7 @@ import type {
   RunDrawResponse,
 } from "@/lib/backend/api";
 import { drawService } from "@/services/drawService";
-import type { Draw, DrawResult, DrawStatus, Prize } from "@/types";
+import type { Draw, DrawResult, DrawStatus, Prize, PrizeTier } from "@/types";
 import {
   Alert,
   Badge,
@@ -47,7 +50,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { DrawStatusBadge } from "@/features/draws/DrawMeta";
 import { formatINR } from "@/utils/money";
 import { formatDateTime, formatNumber } from "@/utils/format";
-import { slugify } from "@/utils/id";
+import { newId, slugify } from "@/utils/id";
 
 /**
  * Statuses an administrator can set by editing. Results and cancellation are
@@ -56,6 +59,30 @@ import { slugify } from "@/utils/id";
  */
 const STATUS_OPTIONS: DrawStatus[] = ["draft", "upcoming", "open", "sales_closed", "in_progress"];
 const LOCKED_STATUSES: DrawStatus[] = ["results_pending", "completed", "cancelled"];
+
+const TIER_OPTIONS: Array<{ value: PrizeTier; label: string }> = [
+  { value: "gold", label: "Gold (picked 1st)" },
+  { value: "silver", label: "Silver (picked 2nd)" },
+  { value: "bronze", label: "Bronze (picked 3rd)" },
+  { value: "special", label: "Special (picked last)" },
+];
+
+interface PrizeDraft {
+  id: string;
+  tier: PrizeTier;
+  title: string;
+  description: string;
+  quantity: string;
+  imageUrl?: string;
+}
+
+function toPrizeDraft(prize: Prize): PrizeDraft {
+  return { ...prize, quantity: String(prize.quantity) };
+}
+
+function newPrizeDraft(): PrizeDraft {
+  return { id: newId("prize"), tier: "special", title: "", description: "", quantity: "1" };
+}
 
 interface DrawDraft {
   title: string;
@@ -71,6 +98,7 @@ interface DrawDraft {
   eligibility: string;
   status: DrawStatus;
   published: boolean;
+  prizes: PrizeDraft[];
 }
 
 function toLocalInput(iso?: string): string {
@@ -102,6 +130,7 @@ const EMPTY_DRAFT: DrawDraft = {
   eligibility: "Open to participants aged 18 and above.",
   status: "draft",
   published: false,
+  prizes: [],
 };
 
 export function AdminDrawsPage() {
@@ -122,6 +151,7 @@ export function AdminDrawsPage() {
   const [note, setNote] = useState("");
 
   const draws = useAsync(() => drawService.listAll(200), []);
+  const prizesLocked = LOCKED_STATUSES.includes(draft.status);
 
   const rows = useMemo(() => {
     const all = draws.data ?? [];
@@ -157,6 +187,7 @@ export function AdminDrawsPage() {
       eligibility: draw.eligibility,
       status: draw.status,
       published: draw.published,
+      prizes: (draw.prizes ?? []).map(toPrizeDraft),
     });
     setEditing(draw);
     setFormError(null);
@@ -193,6 +224,34 @@ export function AdminDrawsPage() {
       return setFormError("Sales must close before the draw time.");
     }
 
+    const prizes: Prize[] = [];
+    for (const [index, row] of draft.prizes.entries()) {
+      const label = row.title.trim() || `Prize ${index + 1}`;
+      const quantity = Number(row.quantity);
+      if (row.title.trim().length < 2) return setFormError(`Give prize ${index + 1} a name, e.g. “1st prize”.`);
+      if (row.description.trim().length < 3) return setFormError(`Describe the reward for “${label}”.`);
+      if (!Number.isInteger(quantity) || quantity < 0) {
+        return setFormError(`“${label}” needs a whole number of winners (0 for every participant).`);
+      }
+      prizes.push({
+        id: row.id,
+        tier: row.tier,
+        title: row.title.trim(),
+        description: row.description.trim(),
+        quantity,
+        ...(row.imageUrl ? { imageUrl: row.imageUrl } : {}),
+      });
+    }
+    const winnerCount = prizes.reduce((sum, prize) => sum + prize.quantity, 0);
+    if (winnerCount > end - start + 1) {
+      return setFormError(
+        `The prizes need ${formatNumber(winnerCount)} winners but the draw has only ${formatNumber(end - start + 1)} tickets.`,
+      );
+    }
+    if (draft.status !== "draft" && !prizesLocked && winnerCount === 0) {
+      return setFormError("Add at least one prize with winners before opening this draw.");
+    }
+
     setSaving(true);
     try {
       const payload = {
@@ -213,16 +272,14 @@ export function AdminDrawsPage() {
         maxTicketsPerUser: maxPerUser,
         eligibility: draft.eligibility.trim(),
         published: draft.published,
+        ...(prizesLocked ? {} : { prizes }),
       };
 
       if (editing) {
         await drawService.update(editing.id, payload as Partial<Draw>);
         toast.success("Draw updated", title);
       } else {
-        await drawService.create({
-          ...payload,
-          prizes: [] as Prize[],
-        } as never);
+        await drawService.create(payload as never);
         toast.success("Draw created", "Generate its ticket inventory before opening sales.");
       }
       setCreating(false);
@@ -643,11 +700,72 @@ export function AdminDrawsPage() {
             </span>
           </label>
 
-          <Alert tone="info" title="Prize tiers">
-            Ticket prices and schedules are editable here. Prize tiers are stored on the draw document
-            and are set when the draw is provisioned — changing them after tickets are sold would
-            misrepresent the published offer.
-          </Alert>
+          <section aria-labelledby="draw-prizes-title" className="space-y-3">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <h3 id="draw-prizes-title" className="text-[14px] font-semibold text-ink">
+                  Prizes
+                </h3>
+                <p className="text-[12px] text-muted">
+                  Shown on the home page, the booking page and the draw page. Set winners to 0 for a perk
+                  every participant gets, such as a discount coupon.
+                </p>
+              </div>
+              {prizesLocked ? null : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setDraft({ ...draft, prizes: [...draft.prizes, newPrizeDraft()] })}
+                  iconLeft={<Plus className="size-3.5" aria-hidden />}
+                >
+                  Add prize
+                </Button>
+              )}
+            </div>
+
+            {prizesLocked ? (
+              <Alert tone="info" title="Prizes are locked">
+                Winners have already been drawn for this draw (or it was cancelled), so its prizes can no
+                longer change.
+              </Alert>
+            ) : null}
+
+            {draft.prizes.length ? (
+              draft.prizes.map((prize, index) => (
+                <PrizeRow
+                  key={prize.id}
+                  prize={prize}
+                  index={index}
+                  count={draft.prizes.length}
+                  disabled={prizesLocked}
+                  onChange={(patch) =>
+                    setDraft({
+                      ...draft,
+                      prizes: draft.prizes.map((p) => (p.id === prize.id ? { ...p, ...patch } : p)),
+                    })
+                  }
+                  onMove={(delta) => {
+                    const next = [...draft.prizes];
+                    const [moved] = next.splice(index, 1);
+                    next.splice(index + delta, 0, moved);
+                    setDraft({ ...draft, prizes: next });
+                  }}
+                  onRemove={() => setDraft({ ...draft, prizes: draft.prizes.filter((p) => p.id !== prize.id) })}
+                />
+              ))
+            ) : (
+              <p className="rounded-xl border border-dashed border-line px-3 py-5 text-center text-[13px] text-muted">
+                No prizes yet. Add the 1st, 2nd and 3rd prizes and any gift boxes or coupons.
+              </p>
+            )}
+
+            {!prizesLocked && editing?.published ? (
+              <Alert tone="warning" title="Ticket holders are told about changes">
+                This draw is public. Saving changed prizes sends every ticket holder a notification that the
+                prize details were updated.
+              </Alert>
+            ) : null}
+          </section>
 
           <div className="flex flex-wrap justify-end gap-2">
             <Button
@@ -812,5 +930,111 @@ export function AdminDrawsPage() {
         )}
       </Dialog>
     </>
+  );
+}
+
+function PrizeRow({
+  prize,
+  index,
+  count,
+  disabled,
+  onChange,
+  onMove,
+  onRemove,
+}: {
+  prize: PrizeDraft;
+  index: number;
+  count: number;
+  disabled: boolean;
+  onChange: (patch: Partial<PrizeDraft>) => void;
+  onMove: (delta: -1 | 1) => void;
+  onRemove: () => void;
+}) {
+  const id = `prize-${prize.id}`;
+  return (
+    <div className="rounded-xl border border-line bg-ivory/50 p-3">
+      <div className="grid gap-3 sm:grid-cols-[1fr_6.5rem_11rem]">
+        <div>
+          <Label htmlFor={`${id}-title`} required>
+            Prize name
+          </Label>
+          <Input
+            id={`${id}-title`}
+            value={prize.title}
+            disabled={disabled}
+            maxLength={60}
+            onChange={(event) => onChange({ title: event.target.value })}
+            placeholder="e.g. 1st prize"
+          />
+        </div>
+        <div>
+          <Label htmlFor={`${id}-qty`} required hint="0 = all">
+            Winners
+          </Label>
+          <Input
+            id={`${id}-qty`}
+            inputMode="numeric"
+            value={prize.quantity}
+            disabled={disabled}
+            onChange={(event) => onChange({ quantity: event.target.value.replace(/\D/g, "") })}
+          />
+        </div>
+        <div>
+          <Label htmlFor={`${id}-tier`} required>
+            Tier
+          </Label>
+          <Select
+            id={`${id}-tier`}
+            value={prize.tier}
+            disabled={disabled}
+            onChange={(event) => onChange({ tier: event.target.value as PrizeTier })}
+          >
+            {TIER_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        </div>
+      </div>
+      <div className="mt-3">
+        <Label htmlFor={`${id}-reward`} required>
+          Reward
+        </Label>
+        <Input
+          id={`${id}-reward`}
+          value={prize.description}
+          disabled={disabled}
+          maxLength={200}
+          onChange={(event) => onChange({ description: event.target.value })}
+          placeholder="e.g. ₹7,500 cash or a gift of equal value"
+        />
+      </div>
+      {disabled ? null : (
+        <div className="mt-2 flex justify-end gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={index === 0}
+            onClick={() => onMove(-1)}
+            aria-label={`Move ${prize.title || "prize"} up`}
+          >
+            <ArrowUp className="size-3.5" aria-hidden />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={index === count - 1}
+            onClick={() => onMove(1)}
+            aria-label={`Move ${prize.title || "prize"} down`}
+          >
+            <ArrowDown className="size-3.5" aria-hidden />
+          </Button>
+          <Button size="sm" variant="ghost" onClick={onRemove} aria-label={`Remove ${prize.title || "prize"}`}>
+            <Trash2 className="size-3.5 text-brand" aria-hidden />
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }

@@ -111,6 +111,7 @@ service cloud.firestore {
         && d.ticketNumberEnd - d.ticketNumberStart < 20000
         && d.maxTicketsPerUser is int && d.maxTicketsPerUser >= 1
         && d.published is bool
+        && (!('prizes' in d) || (d.prizes is list && d.prizes.size() <= 30))
         && d.salesCloseAt is string && d.drawAt is string
         && d.salesCloseAt <= d.drawAt;
     }

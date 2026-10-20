@@ -2,6 +2,7 @@ import type {
   Banner,
   BannerSlot,
   LegalPage,
+  PerformanceSettings,
   SiteSettings,
   SplashConfig,
   TicketPackage,
@@ -75,6 +76,16 @@ export const contentService = {
       items: items.sort((a, b) => a.sortOrder - b.sortOrder),
       updatedAt: new Date().toISOString(),
     });
+  },
+
+  /** Keep-warm switch read by the `keepCallablesWarm` scheduled function. */
+  async performance(): Promise<PerformanceSettings> {
+    const row = await store.get<PerformanceSettings & { id: string }>("siteSettings", "performance");
+    return { keepWarm: row?.keepWarm === true, updatedAt: row?.updatedAt };
+  },
+
+  async setKeepWarm(keepWarm: boolean) {
+    await store.set("siteSettings", "performance", { keepWarm, updatedAt: new Date().toISOString() });
   },
 
   async legalPages(): Promise<LegalPage[]> {

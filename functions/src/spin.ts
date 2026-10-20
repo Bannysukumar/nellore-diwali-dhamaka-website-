@@ -1,7 +1,6 @@
-import { onCall } from "firebase-functions/v2/https";
+import { hotCallable } from "./warm.js";
 import {
   COLLECTIONS,
-  HOT_CALLABLE_OPTIONS,
   InsufficientFundsError,
   applyLedger,
   clean,
@@ -71,7 +70,7 @@ export function rewardAvailable(reward: Reward | null | undefined): reward is Re
  * `spinPricePaise` instead of consuming an earned spin; the debit commits in
  * the same transaction as the outcome.
  */
-export const executeSpin = onCall<unknown>(HOT_CALLABLE_OPTIONS, async (request): Promise<ExecuteSpinResponse> => {
+export const executeSpin = hotCallable(async (request): Promise<ExecuteSpinResponse> => {
   const user = await requireUser(request.auth);
   const config = await readSpinConfig();
   const data = requireObject<Record<string, unknown>>(request.data);

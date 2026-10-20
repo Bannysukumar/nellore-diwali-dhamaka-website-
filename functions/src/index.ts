@@ -28,6 +28,7 @@ export {
   releaseUnpublishedDraws,
   verifyOrderIntegrity,
 } from "./scheduled.js";
+export { keepCallablesWarm } from "./warm.js";
 
 /* --------------------------------------------------------------- triggers   */
 export {

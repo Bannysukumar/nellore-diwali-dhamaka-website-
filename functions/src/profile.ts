@@ -1,9 +1,8 @@
 import { randomInt } from "node:crypto";
 import { getAuth } from "firebase-admin/auth";
-import { onCall } from "firebase-functions/v2/https";
+import { hotCallable } from "./warm.js";
 import {
   COLLECTIONS,
-  HOT_CALLABLE_OPTIONS,
   clean,
   db,
   enforceRateLimit,
@@ -61,8 +60,7 @@ export interface EnsureProfileResponse {
 
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-export const ensureUserProfile = onCall<unknown>(
-  HOT_CALLABLE_OPTIONS,
+export const ensureUserProfile = hotCallable(
   async (request): Promise<EnsureProfileResponse> => {
     const auth = request.auth;
     if (!auth?.uid) unauthenticated("Please sign in to continue.");

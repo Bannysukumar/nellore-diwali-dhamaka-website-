@@ -1,8 +1,8 @@
 import { onCall } from "firebase-functions/v2/https";
+import { hotCallable } from "./warm.js";
 import {
   CALLABLE_OPTIONS,
   COLLECTIONS,
-  HOT_CALLABLE_OPTIONS,
   InsufficientFundsError,
   applyLedger,
   audit,
@@ -51,7 +51,7 @@ export interface PurchaseTicketsResponse {
  * caller's `requestId`, which makes a retried checkout return the original
  * order instead of charging again.
  */
-export const purchaseTickets = onCall<unknown>(HOT_CALLABLE_OPTIONS, async (request): Promise<PurchaseTicketsResponse> => {
+export const purchaseTickets = hotCallable(async (request): Promise<PurchaseTicketsResponse> => {
   const user = await requireUser(request.auth);
   const config = await readSettings();
   const data = requireObject<Record<string, unknown>>(request.data);
