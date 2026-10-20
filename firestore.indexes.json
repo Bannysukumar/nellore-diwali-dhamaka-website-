@@ -117,6 +117,14 @@
       ]
     },
     {
+      "collectionGroup": "spinTransactions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "uid", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "referrals",
       "queryScope": "COLLECTION",
       "fields": [
