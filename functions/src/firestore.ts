@@ -62,6 +62,8 @@ export const COLLECTIONS = {
   rateLimits: "rateLimits",
   /** One document per credited UTR (id = UTR); server-only, denied to every client. */
   creditedUtrs: "creditedUtrs",
+  /** One document per admin balance adjustment (id from requestId); server-only. */
+  walletAdjustments: "walletAdjustments",
 } as const;
 
 /** Firestore rejects `undefined`; strip it so optional fields stay optional. */
@@ -260,7 +262,7 @@ export function applyLedger(
         ? account.totalDepositedPaise + input.amountPaise
         : account.totalDepositedPaise,
     totalSpentPaise:
-      input.type === "ticket_purchase"
+      input.type === "ticket_purchase" || input.type === "spin_purchase"
         ? account.totalSpentPaise + input.amountPaise
         : input.type === "refund"
           ? Math.max(0, account.totalSpentPaise - input.amountPaise)

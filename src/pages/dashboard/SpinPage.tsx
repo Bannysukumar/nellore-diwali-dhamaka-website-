@@ -9,6 +9,7 @@ import { callBackend } from "@/lib/backend/callBackend";
 import type { ExecuteSpinRequest, ExecuteSpinResponse } from "@/lib/backend/api";
 import { describeStoreError } from "@/lib/backend";
 import { rewardService } from "@/services/rewardService";
+import { walletService } from "@/services/walletService";
 import type { ReferralQualification, Reward, SpinAccount, SpinTransaction } from "@/types";
 import {
   Alert,
@@ -53,6 +54,11 @@ export function SpinPage() {
     { enabled: Boolean(uid) },
   );
   const rewards = useAsync(() => rewardService.rewards(), []);
+  const wallet = useAsync(
+    async () => (uid ? await walletService.account(uid) : null),
+    [uid],
+    { enabled: Boolean(uid) },
+  );
 
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState<ExecuteSpinResponse | null>(null);
@@ -79,10 +85,14 @@ export function SpinPage() {
     return started && notEnded;
   }, [spinConfig]);
 
-  const canSpin = Boolean(spinConfig?.enabled) && campaignOpen && spinsLeft > 0 && !spinning;
+  const spinPricePaise = spinConfig?.spinPricePaise ?? 0;
+  const balancePaise = wallet.data?.balancePaise ?? 0;
+  const wheelLive = Boolean(spinConfig?.enabled) && campaignOpen && !spinning;
+  const canSpin = wheelLive && spinsLeft > 0;
+  const canBuySpin = wheelLive && spinPricePaise > 0 && balancePaise >= spinPricePaise;
 
-  const doSpin = async () => {
-    if (!canSpin) return;
+  const doSpin = async (payWithWallet: boolean) => {
+    if (payWithWallet ? !canBuySpin : !canSpin) return;
     setError(null);
     setResult(null);
     setRevealSegment(null);
@@ -92,6 +102,7 @@ export function SpinPage() {
       /* The backend selects the outcome. The wheel only animates the reveal. */
       const outcome = await callBackend<ExecuteSpinRequest, ExecuteSpinResponse>("executeSpin", {
         requestId: requestId.current,
+        payWithWallet,
       });
       setResult(outcome);
       setRevealSegment(outcome.segmentId);
@@ -103,6 +114,9 @@ export function SpinPage() {
         totalUsed: (spinAccount?.totalUsed ?? 0) + 1,
         updatedAt: new Date().toISOString(),
       });
+      if (typeof outcome.balancePaise === "number" && wallet.data) {
+        wallet.setData({ ...wallet.data, balancePaise: outcome.balancePaise });
+      }
       history.reload();
       toast.success("Spin complete", `You received: ${outcome.rewardName}`);
     } catch (err) {
@@ -168,7 +182,13 @@ export function SpinPage() {
           icon={Sparkles}
           tone="gold"
         />
-        <StatCard label="Spins earned" value={spinAccount?.totalEarned ?? 0} hint="From referrals" />
+        <StatCard
+          label="Wallet balance"
+          value={wallet.loading ? "—" : formatINR(balancePaise)}
+          hint={spinPricePaise > 0 ? `${formatINR(spinPricePaise)} per paid spin` : "Paid spins are off"}
+          icon={Wallet}
+          tone="emerald"
+        />
         <StatCard label="Spins used" value={spinAccount?.totalUsed ?? 0} hint="All time" />
         <StatCard
           label="Daily limit"
@@ -218,6 +238,11 @@ export function SpinPage() {
                     You received
                   </p>
                   <p className="mt-1 font-display text-[22px] text-ink">{result.rewardName}</p>
+                  {result.paidPaise > 0 ? (
+                    <p className="mt-1 text-[12px] text-muted">
+                      {formatINR(result.paidPaise)} paid from your wallet
+                    </p>
+                  ) : null}
                   {typeof result.walletCreditPaise === "number" && result.walletCreditPaise > 0 ? (
                     <p className="mt-1 text-[13px] font-semibold text-emerald">
                       {formatINR(result.walletCreditPaise)} credited to your wallet
@@ -231,29 +256,51 @@ export function SpinPage() {
                 </div>
               ) : null}
 
-              <Button
-                size="lg"
-                variant="gold"
-                onClick={() => void doSpin()}
-                loading={spinning}
-                disabled={!canSpin}
-                iconLeft={<Sparkles className="size-4" aria-hidden />}
-              >
-                {spinning
-                  ? "Spinning…"
-                  : spinsLeft > 0
-                    ? "Spin the wheel"
-                    : "No spins available"}
-              </Button>
+              <div className="flex flex-wrap items-center justify-center gap-2.5">
+                {spinsLeft > 0 || spinPricePaise <= 0 ? (
+                  <Button
+                    size="lg"
+                    variant="gold"
+                    onClick={() => void doSpin(false)}
+                    loading={spinning}
+                    disabled={!canSpin}
+                    iconLeft={<Sparkles className="size-4" aria-hidden />}
+                  >
+                    {spinning ? "Spinning…" : spinsLeft > 0 ? "Use a free spin" : "No spins available"}
+                  </Button>
+                ) : null}
+                {spinPricePaise > 0 ? (
+                  <Button
+                    size="lg"
+                    variant={spinsLeft > 0 ? "outline" : "gold"}
+                    onClick={() => void doSpin(true)}
+                    loading={spinning}
+                    disabled={!canBuySpin}
+                    iconLeft={<Wallet className="size-4" aria-hidden />}
+                  >
+                    {spinning ? "Spinning…" : `Spin for ${formatINR(spinPricePaise)}`}
+                  </Button>
+                ) : null}
+              </div>
+
+              {spinPricePaise > 0 && !wallet.loading && balancePaise < spinPricePaise ? (
+                <p className="max-w-sm text-center text-[12px] leading-relaxed text-muted">
+                  A paid spin costs {formatINR(spinPricePaise)} and your wallet has {formatINR(balancePaise)}.{" "}
+                  <Link to="/dashboard/wallet" className="font-semibold text-brand hover:underline">
+                    Add money
+                  </Link>{" "}
+                  to spin.
+                </p>
+              ) : null}
 
               {spinsLeft > 0 ? (
                 <p className="text-[12px] text-muted">
-                  You have <strong className="text-ink">{spinsLeft}</strong> spin
+                  You have <strong className="text-ink">{spinsLeft}</strong> free spin
                   {spinsLeft === 1 ? "" : "s"} available.
                 </p>
               ) : (
                 <p className="max-w-sm text-center text-[12px] leading-relaxed text-muted">
-                  You have no spins right now.{" "}
+                  You have no free spins right now.{" "}
                   <Link to="/dashboard/referrals" className="font-semibold text-brand hover:underline">
                     Invite a friend
                   </Link>{" "}

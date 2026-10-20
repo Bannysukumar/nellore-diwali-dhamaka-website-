@@ -119,4 +119,65 @@ describe("referrals and the spin wheel", () => {
     }
     expect(await spinsOf(user.uid)).toBe(1);
   });
+
+  it("sells a spin for the configured price from the wallet without touching earned spins", async () => {
+    const user = await registerCustomer("Paid Spinner");
+    await db.doc(`spinAccounts/${user.uid}`).set({ availableSpins: 1 }, { merge: true });
+    await db.doc(`walletAccounts/${user.uid}`).set({
+      uid: user.uid,
+      balancePaise: 3_000,
+      totalDepositedPaise: 3_000,
+      totalSpentPaise: 0,
+      pendingDepositPaise: 0,
+      updatedAt: new Date().toISOString(),
+    });
+
+    expect(
+      await callError("executeSpin", { requestId: requestId("spin"), payWithWallet: true }, user.token),
+    ).toBe("FAILED_PRECONDITION");
+
+    await writeSpinConfig({ spinPricePaise: 2_000 });
+    try {
+      const id = requestId("spin");
+      const paid = await call<{ spinId: string; paidPaise: number; balancePaise: number; availableSpins: number }>(
+        "executeSpin",
+        { requestId: id, payWithWallet: true },
+        user.token,
+      );
+      expect(paid.paidPaise).toBe(2_000);
+      // 30.00 − 20.00 price + 10.00 wallet-credit reward
+      expect(paid.balancePaise).toBe(2_000);
+      expect(paid.availableSpins).toBe(1);
+      expect(await spinsOf(user.uid)).toBe(1);
+
+      const replay = await call<{ spinId: string }>("executeSpin", { requestId: id, payWithWallet: true }, user.token);
+      expect(replay.spinId).toBe(paid.spinId);
+      expect((await walletOf(user.uid)).balancePaise).toBe(2_000);
+      expect((await ledgerOf(user.uid)).filter((t) => t.type === "spin_purchase")).toHaveLength(1);
+      expect((await walletOf(user.uid)).totalSpentPaise).toBe(2_000);
+
+      // Second paid spin hits the daily limit of 2 before the wallet is touched.
+      await call("executeSpin", { requestId: requestId("spin"), payWithWallet: true }, user.token);
+      expect(
+        await callError("executeSpin", { requestId: requestId("spin"), payWithWallet: true }, user.token),
+      ).toBe("RESOURCE_EXHAUSTED");
+      expect((await walletOf(user.uid)).balancePaise).toBe(1_000);
+    } finally {
+      await writeSpinConfig();
+    }
+  });
+
+  it("refuses a paid spin the wallet cannot cover and leaves nothing behind", async () => {
+    const user = await registerCustomer("Short Wallet");
+    await writeSpinConfig({ spinPricePaise: 5_000 });
+    try {
+      expect(
+        await callError("executeSpin", { requestId: requestId("spin"), payWithWallet: true }, user.token),
+      ).toBe("FAILED_PRECONDITION");
+    } finally {
+      await writeSpinConfig();
+    }
+    expect((await db.collection("spinTransactions").where("uid", "==", user.uid).get()).size).toBe(0);
+    expect(await ledgerOf(user.uid)).toHaveLength(0);
+  });
 });

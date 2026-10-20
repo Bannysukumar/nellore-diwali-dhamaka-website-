@@ -92,6 +92,7 @@ interface CampaignDraft {
   maxReferralsPerAccount: string;
   rewardValidDays: string;
   minAge: string;
+  spinPriceRupees: string;
   campaignStart: string;
   campaignEnd: string;
 }
@@ -116,6 +117,7 @@ function toCampaignDraft(config: SpinConfig): CampaignDraft {
     maxReferralsPerAccount: String(config.maxReferralsPerAccount),
     rewardValidDays: String(config.rewardValidDays),
     minAge: String(config.minAge),
+    spinPriceRupees: String(Math.round((config.spinPricePaise ?? 0) / 100)),
     campaignStart: toLocalInput(config.campaignStart),
     campaignEnd: toLocalInput(config.campaignEnd),
   };
@@ -330,6 +332,7 @@ export function AdminRewardsPage() {
         maxReferralsPerAccount: whole(campaign.maxReferralsPerAccount, "Maximum qualified referrals per referrer", 1),
         rewardValidDays: whole(campaign.rewardValidDays, "Reward validity", 1),
         minAge: whole(campaign.minAge, "Minimum age", 18),
+        spinPricePaise: whole(campaign.spinPriceRupees || "0", "Price per paid spin", 0) * 100,
         campaignStart,
         campaignEnd,
         updatedAt: new Date().toISOString(),
@@ -348,9 +351,11 @@ export function AdminRewardsPage() {
         action: "spin.config.update",
         entity: "siteSettings",
         entityId: "spin",
-        note: `Campaign rules saved (wheel ${next.enabled ? "enabled" : "disabled"})`,
-        before: config.data ? { enabled: config.data.enabled } : undefined,
-        after: { enabled: next.enabled },
+        note: `Campaign rules saved (wheel ${next.enabled ? "enabled" : "disabled"}, paid spin ${next.spinPricePaise ? formatINR(next.spinPricePaise) : "off"})`,
+        before: config.data
+          ? { enabled: config.data.enabled, spinPricePaise: config.data.spinPricePaise ?? 0 }
+          : undefined,
+        after: { enabled: next.enabled, spinPricePaise: next.spinPricePaise },
       });
       toast.success("Campaign rules saved", next.enabled ? "The wheel is live." : "The wheel is disabled.");
       setCampaign(null);
@@ -563,6 +568,7 @@ export function AdminRewardsPage() {
                     ["dailySpinLimit", "Spins allowed per day", ""],
                     ["rewardValidDays", "Reward validity", "Days"],
                     ["minAge", "Minimum age", "Years"],
+                    ["spinPriceRupees", "Price per paid spin (₹)", "0 = earned spins only"],
                   ] as const
                 ).map(([key, label, hint]) => (
                   <div key={key}>

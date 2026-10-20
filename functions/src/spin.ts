@@ -2,6 +2,7 @@ import { onCall } from "firebase-functions/v2/https";
 import {
   CALLABLE_OPTIONS,
   COLLECTIONS,
+  InsufficientFundsError,
   applyLedger,
   clean,
   db,
@@ -25,7 +26,7 @@ import type {
   SpinTransaction,
   WheelSegment,
 } from "./domain/types.js";
-import { nowIso, weightedPick } from "./domain/shared.js";
+import { formatPaise, nowIso, weightedPick } from "./domain/shared.js";
 
 export interface ExecuteSpinResponse {
   spinId: string;
@@ -36,6 +37,10 @@ export interface ExecuteSpinResponse {
   rewardExpiresAt?: string;
   walletCreditPaise: number;
   availableSpins: number;
+  /** Amount debited from the wallet for this spin; 0 when an earned spin was used. */
+  paidPaise: number;
+  /** Wallet balance after the spin, when the wallet was touched. */
+  balancePaise?: number;
 }
 
 /** Calendar day in India, used for the daily spin limit. */
@@ -61,12 +66,21 @@ export function rewardAvailable(reward: Reward | null | undefined): reward is Re
  * decrement and any wallet credit commit in one transaction, and the spin
  * document id is derived from the caller's `requestId`, so a retried request
  * returns the original outcome instead of spinning again.
+ *
+ * With `payWithWallet: true` the spin is bought for the admin-set
+ * `spinPricePaise` instead of consuming an earned spin; the debit commits in
+ * the same transaction as the outcome.
  */
 export const executeSpin = onCall<unknown>(CALLABLE_OPTIONS, async (request): Promise<ExecuteSpinResponse> => {
   const user = await requireUser(request.auth);
   const config = await readSpinConfig();
   const data = requireObject<Record<string, unknown>>(request.data);
   const requestId = requireRequestId(data);
+  const payWithWallet = data.payWithWallet === true;
+  const pricePaise = config.spinPricePaise ?? 0;
+  if (payWithWallet && !(Number.isInteger(pricePaise) && pricePaise > 0)) {
+    failedPrecondition("Paid spins are not available right now.");
+  }
   const spinRef = db().collection(COLLECTIONS.spinTransactions).doc(`spin_${user.uid.slice(0, 12)}_${requestId}`);
 
   const replay = await spinRef.get();
@@ -84,6 +98,7 @@ export const executeSpin = onCall<unknown>(CALLABLE_OPTIONS, async (request): Pr
       rewardExpiresAt: row.rewardExpiresAt,
       walletCreditPaise: 0,
       availableSpins: account?.availableSpins ?? 0,
+      paidPaise: row.paidPaise ?? 0,
     };
   }
 
@@ -119,7 +134,7 @@ export const executeSpin = onCall<unknown>(CALLABLE_OPTIONS, async (request): Pr
       ? new Date(Date.now() + validDays * 86_400_000).toISOString()
       : undefined;
 
-  const result = await db().runTransaction(async (tx) => {
+  const runSpin = () => db().runTransaction(async (tx) => {
     // ---- read phase -------------------------------------------------------
     const accountRef = db().collection(COLLECTIONS.spinAccounts).doc(user.uid);
     const rewardRef = db().collection(COLLECTIONS.rewards).doc(reward.id);
@@ -134,16 +149,18 @@ export const executeSpin = onCall<unknown>(CALLABLE_OPTIONS, async (request): Pr
           .where("createdAt", ">=", istDayStartIso(createdAt)),
       ),
     ]);
-    const wallet = reward.type === "wallet_credit" ? await readWallet(tx, user.uid) : null;
+    const wallet =
+      payWithWallet || reward.type === "wallet_credit" ? await readWallet(tx, user.uid) : null;
 
     if (existingSpin.exists) aborted("This spin is already being processed. Please refresh.");
 
     const account: SpinAccount = accountSnap.exists
       ? (accountSnap.data() as SpinAccount)
       : { uid: user.uid, availableSpins: 0, totalEarned: 0, totalUsed: 0, updatedAt: createdAt };
-    if (account.availableSpins <= 0) {
+    if (!payWithWallet && account.availableSpins <= 0) {
       failedPrecondition("You have no spins available right now.");
     }
+    const spinsAfter = payWithWallet ? account.availableSpins : account.availableSpins - 1;
 
     const today = istDayKey(createdAt);
     const usedToday = historySnap.docs.filter(
@@ -170,17 +187,32 @@ export const executeSpin = onCall<unknown>(CALLABLE_OPTIONS, async (request): Pr
       rewardType: liveReward.type,
       rewardExpiresAt,
       couponCode: liveReward.type === "coupon" ? liveReward.couponCode : undefined,
+      paidPaise: payWithWallet ? pricePaise : undefined,
       status: "awarded" as const,
       requestId,
       createdAt,
     }) as SpinTransaction;
+
+    // Debit first: an overdraw throws before anything else is written.
+    if (payWithWallet && wallet) {
+      applyLedger(tx, wallet, {
+        uid: user.uid,
+        type: "spin_purchase",
+        direction: "debit",
+        amountPaise: pricePaise,
+        description: "Spin wheel — paid spin",
+        refId: spinRef.id,
+        actor: user.uid,
+      });
+    }
+
     tx.set(spinRef, spin);
 
     tx.set(
       accountRef,
       {
         uid: user.uid,
-        availableSpins: account.availableSpins - 1,
+        availableSpins: spinsAfter,
         totalEarned: account.totalEarned,
         totalUsed: account.totalUsed + 1,
         updatedAt: createdAt,
@@ -206,8 +238,24 @@ export const executeSpin = onCall<unknown>(CALLABLE_OPTIONS, async (request): Pr
       walletCreditPaise = liveReward.valuePaise;
     }
 
-    return { walletCreditPaise, availableSpins: account.availableSpins - 1 };
+    return {
+      walletCreditPaise,
+      availableSpins: spinsAfter,
+      balancePaise: wallet ? wallet.account.balancePaise : undefined,
+    };
   });
+
+  let result: Awaited<ReturnType<typeof runSpin>>;
+  try {
+    result = await runSpin();
+  } catch (error) {
+    if (error instanceof InsufficientFundsError) {
+      failedPrecondition(
+        `Insufficient wallet balance. A spin costs ${formatPaise(pricePaise)} but you have ${formatPaise(error.balancePaise)}. Add money to continue.`,
+      );
+    }
+    throw error;
+  }
 
   await notify(
     user.uid,
@@ -228,5 +276,7 @@ export const executeSpin = onCall<unknown>(CALLABLE_OPTIONS, async (request): Pr
     rewardExpiresAt,
     walletCreditPaise: result.walletCreditPaise,
     availableSpins: result.availableSpins,
+    paidPaise: payWithWallet ? pricePaise : 0,
+    balancePaise: result.balancePaise,
   };
 });

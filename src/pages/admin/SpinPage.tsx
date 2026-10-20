@@ -20,6 +20,7 @@ import {
 } from "@/components/ui";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { formatDateTime, formatNumber, formatPercent } from "@/utils/format";
+import { formatINR } from "@/utils/money";
 
 const REWARD_TONE: Record<RewardType, "gold" | "brand" | "emerald" | "warning" | "muted"> = {
   coupon: "gold",
@@ -182,6 +183,10 @@ export function AdminSpinPage() {
                   <Line label="Spins per qualified referral" value={String(config.data.spinsPerReferral)} />
                   <Line label="Maximum spins per account" value={String(config.data.maxSpinsPerUser)} />
                   <Line label="Daily spin limit" value={String(config.data.dailySpinLimit)} />
+                  <Line
+                    label="Price per paid spin"
+                    value={config.data.spinPricePaise ? formatINR(config.data.spinPricePaise) : "Off (earned spins only)"}
+                  />
                   <Line label="Maximum referral rewards" value={String(config.data.maxRewardsPerReferrer)} />
                   <Line label="Reward validity" value={`${config.data.rewardValidDays} days`} />
                   <Line label="Minimum age" value={`${config.data.minAge}+`} />

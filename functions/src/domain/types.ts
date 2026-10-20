@@ -136,7 +136,8 @@ export type WalletTxType =
   | "ticket_purchase"
   | "refund"
   | "adjustment"
-  | "reward_credit";
+  | "reward_credit"
+  | "spin_purchase";
 
 export type WalletTxDirection = "credit" | "debit";
 
@@ -260,6 +261,8 @@ export interface SpinConfig {
   rewardValidDays: number;
   minAge: number;
   maxReferralsPerAccount: number;
+  /** Price of one wallet-paid spin. 0 or absent: spins are earned only. */
+  spinPricePaise?: number;
   segments: WheelSegment[];
   updatedAt: ISODate;
 }
@@ -281,6 +284,8 @@ export interface SpinTransaction {
   rewardType: RewardType;
   rewardExpiresAt?: ISODate;
   couponCode?: string;
+  /** Set when the spin was paid from the wallet instead of using an earned spin. */
+  paidPaise?: number;
   status: "awarded" | "reversed";
   requestId: string;
   createdAt: ISODate;

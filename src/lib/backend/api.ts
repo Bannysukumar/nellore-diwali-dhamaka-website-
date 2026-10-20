@@ -157,6 +157,8 @@ export interface ModerateReferralResponse {
 
 export interface ExecuteSpinRequest {
   requestId: string;
+  /** Buy this spin for the configured price instead of using an earned spin. */
+  payWithWallet?: boolean;
 }
 export interface ExecuteSpinResponse {
   spinId: string;
@@ -167,6 +169,8 @@ export interface ExecuteSpinResponse {
   rewardExpiresAt?: string;
   walletCreditPaise: number;
   availableSpins: number;
+  paidPaise: number;
+  balancePaise?: number;
 }
 
 /* ----------------------------------------------------------------- draw --- */
@@ -228,6 +232,22 @@ export interface BroadcastAnnouncementRequest {
 export interface BroadcastAnnouncementResponse {
   delivered: number;
   createdAt: string;
+}
+
+export interface AdjustWalletRequest {
+  /** Idempotency key: a retried request is applied at most once. */
+  requestId: string;
+  uid: string;
+  /** `set` replaces the balance; the server records the difference in the ledger. */
+  mode: "credit" | "debit" | "set";
+  amountPaise: number;
+  reason: string;
+}
+export interface AdjustWalletResponse {
+  uid: string;
+  mode: AdjustWalletRequest["mode"];
+  deltaPaise: number;
+  balancePaise: number;
 }
 
 export interface LogAdminActionRequest {

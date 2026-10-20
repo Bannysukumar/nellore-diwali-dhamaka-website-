@@ -179,4 +179,43 @@ describe("wallet deposits and manual verification", () => {
     await call("reviewDeposit", { depositId: loser.depositId, decision: "reject", reason: "UTR already credited" }, admin.token);
     expect((await db.doc(`depositRequests/${loser.depositId}`).get()).get("status")).toBe("rejected");
   });
+
+  it("lets only an administrator adjust a balance, through the ledger, exactly once per request", async () => {
+    const user = await registerCustomer("Adjusted Customer");
+    const credit = (mode: string, amountPaise: number, id = requestId("adj"), token = admin.token) =>
+      call<{ deltaPaise: number; balancePaise: number }>(
+        "adjustWallet",
+        { requestId: id, uid: user.uid, mode, amountPaise, reason: "Counter cash" },
+        token,
+      );
+
+    expect(
+      await callError(
+        "adjustWallet",
+        { requestId: requestId("adj"), uid: user.uid, mode: "credit", amountPaise: 10_000, reason: "Self credit" },
+        user.token,
+      ),
+    ).toBe("PERMISSION_DENIED");
+
+    const id = requestId("adj");
+    expect(await credit("credit", 10_000, id)).toMatchObject({ deltaPaise: 10_000, balancePaise: 10_000 });
+    expect(await credit("credit", 10_000, id)).toMatchObject({ balancePaise: 10_000 });
+    expect((await walletOf(user.uid)).balancePaise).toBe(10_000);
+
+    expect(await credit("debit", 2_500)).toMatchObject({ deltaPaise: -2_500, balancePaise: 7_500 });
+    expect(await credit("set", 20_000)).toMatchObject({ deltaPaise: 12_500, balancePaise: 20_000 });
+    expect(await credit("set", 0)).toMatchObject({ deltaPaise: -20_000, balancePaise: 0 });
+    expect(
+      await callError(
+        "adjustWallet",
+        { requestId: requestId("adj"), uid: user.uid, mode: "debit", amountPaise: 1, reason: "Overdraw" },
+        admin.token,
+      ),
+    ).toBe("FAILED_PRECONDITION");
+
+    const adjustments = (await ledgerOf(user.uid)).filter((t) => t.type === "adjustment");
+    expect(adjustments).toHaveLength(4);
+    const net = adjustments.reduce((sum, t) => sum + (t.direction === "credit" ? t.amountPaise : -t.amountPaise), 0);
+    expect(net).toBe((await walletOf(user.uid)).balancePaise);
+  });
 });

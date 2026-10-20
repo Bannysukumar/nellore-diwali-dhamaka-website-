@@ -78,6 +78,7 @@ export const BACKEND_FUNCTIONS = [
   "moderateWinner",
   "logAdminAction",
   "broadcastAnnouncement",
+  "adjustWallet",
 ] as const;
 
 export type BackendFunctionName = (typeof BACKEND_FUNCTIONS)[number];

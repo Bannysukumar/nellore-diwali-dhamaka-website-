@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Ban,
   CheckCircle2,
+  Coins,
   Search,
   ShoppingBag,
   Sparkles,
@@ -19,6 +20,8 @@ import { ticketService } from "@/services/ticketService";
 import { rewardService } from "@/services/rewardService";
 import { adminService } from "@/services/adminService";
 import { useDebounced } from "@/hooks/useCollection";
+import { callBackend } from "@/lib/backend/callBackend";
+import type { AdjustWalletRequest, AdjustWalletResponse } from "@/lib/backend/api";
 import type { SpinAccount, UserProfile, WalletTransaction } from "@/types";
 import {
   Alert,
@@ -40,11 +43,19 @@ import {
   type Column,
 } from "@/components/ui";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { formatINR } from "@/utils/money";
+import { formatINR, parseRupeesToPaise } from "@/utils/money";
 import { formatDate, formatDateTime, formatNumber } from "@/utils/format";
 import { initials } from "@/utils/mask";
+import { newId } from "@/utils/id";
 
 type StatusFilter = "all" | "active" | "suspended";
+type AdjustMode = AdjustWalletRequest["mode"];
+
+const ADJUST_LABEL: Record<AdjustMode, string> = {
+  credit: "Add money",
+  debit: "Deduct money",
+  set: "Set exact balance",
+};
 
 const CUSTOMER_LIST_LIMIT = 500;
 
@@ -58,19 +69,31 @@ export function AdminCustomersPage() {
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [adjustMode, setAdjustMode] = useState<AdjustMode>("credit");
+  const [adjustAmount, setAdjustAmount] = useState("");
+  const [adjustReason, setAdjustReason] = useState("");
+  const [adjustError, setAdjustError] = useState<string | null>(null);
+  const [adjusting, setAdjusting] = useState(false);
+  const adjustRequestId = useRef(newId("adj"));
 
   const customers = useAsync(
     () => userService.listCustomers(CUSTOMER_LIST_LIMIT, filter === "all" ? undefined : filter),
     [filter],
   );
+  const balances = useAsync(async () => {
+    const accounts = await walletService.accounts(CUSTOMER_LIST_LIMIT * 2);
+    return new Map(accounts.map((a) => [(a as typeof a & { id: string }).id, a.balancePaise]));
+  }, []);
 
   const rows = useMemo(() => {
     let all = customers.data ?? [];
     if (debounced) {
+      const digits = debounced.replace(/\D/g, "");
       all = all.filter(
         (c) =>
           c.fullName.toLowerCase().includes(debounced) ||
-          c.phoneMasked.toLowerCase().includes(debounced) ||
+          (digits.length >= 3 && (c.phone ?? "").replace(/\D/g, "").includes(digits)) ||
+          (c.email ?? "").toLowerCase().includes(debounced) ||
           c.referralCode.toLowerCase().includes(debounced),
       );
     }
@@ -147,6 +170,43 @@ export function AdminCustomersPage() {
     }
   };
 
+  const adjustWallet = async () => {
+    if (!selected) return;
+    setAdjustError(null);
+    const amountPaise = parseRupeesToPaise(adjustAmount);
+    if (!Number.isInteger(amountPaise) || amountPaise < 0 || (adjustMode !== "set" && amountPaise === 0)) {
+      setAdjustError("Enter a valid amount in rupees.");
+      return;
+    }
+    if (adjustReason.trim().length < 3) {
+      setAdjustError("Write a short reason; it is shown in the customer's wallet history.");
+      return;
+    }
+    setAdjusting(true);
+    try {
+      const outcome = await callBackend<AdjustWalletRequest, AdjustWalletResponse>("adjustWallet", {
+        requestId: adjustRequestId.current,
+        uid: selected.uid,
+        mode: adjustMode,
+        amountPaise,
+        reason: adjustReason.trim(),
+      });
+      toast.success(
+        "Wallet updated",
+        `${selected.fullName}: ${outcome.deltaPaise > 0 ? "+" : "−"}${formatINR(Math.abs(outcome.deltaPaise))} · balance ${formatINR(outcome.balancePaise)}`,
+      );
+      adjustRequestId.current = newId("adj");
+      setAdjustAmount("");
+      setAdjustReason("");
+      detail.reload();
+      balances.reload();
+    } catch (err) {
+      setAdjustError(err instanceof Error ? err.message : "The wallet could not be updated.");
+    } finally {
+      setAdjusting(false);
+    }
+  };
+
   const columns: Array<Column<UserProfile>> = [
     {
       key: "customer",
@@ -158,9 +218,22 @@ export function AdminCustomersPage() {
           </span>
           <div className="min-w-0">
             <p className="truncate font-medium text-ink">{row.fullName}</p>
-            <p className="text-[11px] text-muted">{row.phoneMasked}</p>
+            <a href={`tel:${row.phone}`} className="text-[12px] tabular-nums text-ink hover:underline">
+              {row.phone}
+            </a>
+            {row.email ? <p className="truncate text-[11px] text-muted">{row.email}</p> : null}
           </div>
         </div>
+      ),
+    },
+    {
+      key: "balance",
+      header: "Wallet",
+      align: "right",
+      render: (row) => (
+        <span className="font-semibold tabular-nums text-ink">
+          {balances.data ? formatINR(balances.data.get(row.uid) ?? 0) : "…"}
+        </span>
       ),
     },
     {
@@ -208,6 +281,11 @@ export function AdminCustomersPage() {
     setSelected(row);
     setReason("");
     setError(null);
+    setAdjustMode("credit");
+    setAdjustAmount("");
+    setAdjustReason("");
+    setAdjustError(null);
+    adjustRequestId.current = newId("adj");
   }
 
   return (
@@ -219,7 +297,7 @@ export function AdminCustomersPage() {
         description="Every registered participant. Suspending an account is logged and immediately prevents further purchases — existing tickets and balances are preserved."
       />
 
-      <LoadErrors className="mt-5" sources={[customers, counts, referrals]} />
+      <LoadErrors className="mt-5" sources={[customers, counts, referrals, balances]} />
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Registered customers" value={formatNumber(summary.total)} icon={Users} tone="brand" />
@@ -246,9 +324,9 @@ export function AdminCustomersPage() {
         />
       </div>
 
-      <Alert tone="info" className="mt-4" title="Masked data by default">
-        Phone numbers are stored masked for display. Full contact details are only ever read from the
-        database directly by an authenticated administrator and must not be exported or shared.
+      <Alert tone="info" className="mt-4" title="Full customer details">
+        Names, phone numbers, email and address are shown in full to administrators only. Do not export
+        or share them outside the business.
       </Alert>
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
@@ -270,7 +348,7 @@ export function AdminCustomersPage() {
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search name, phone or referral code"
+            placeholder="Search name, phone, email or referral code"
             className="pl-9"
             aria-label="Search customers"
           />
@@ -313,7 +391,7 @@ export function AdminCustomersPage() {
         size="xl"
         dismissible={!busy}
         title={selected ? selected.fullName : "Customer"}
-        description={selected ? `${selected.phoneMasked} · code ${selected.referralCode}` : undefined}
+        description={selected ? `${selected.phone} · code ${selected.referralCode}` : undefined}
       >
         {selected ? (
           <div className="space-y-4">
@@ -338,6 +416,12 @@ export function AdminCustomersPage() {
             </div>
 
             <dl className="grid gap-2 sm:grid-cols-2">
+              <Line label="Full name" value={selected.fullName} />
+              <Line label="Phone" value={selected.phone} />
+              <Line label="Email" value={selected.email || "—"} />
+              <Line label="Address" value={selected.address || "—"} />
+              <Line label="Customer ID" value={selected.uid} />
+              <Line label="Referral code" value={selected.referralCode} />
               <Line label="Status" value={selected.status} />
               <Line label="Joined" value={formatDateTime(selected.createdAt)} />
               <Line label="Last login" value={formatDateTime(selected.lastLoginAt)} />
@@ -419,6 +503,64 @@ export function AdminCustomersPage() {
                     This account holds no tickets.
                   </p>
                 )}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-line bg-ivory/60 p-3.5">
+              <p className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-muted">
+                <Coins className="size-3.5" aria-hidden />
+                Adjust wallet balance
+              </p>
+              <p className="mt-1 text-[12px] text-muted">
+                Current balance:{" "}
+                <strong className="text-ink">{detail.data ? formatINR(detail.data.wallet.balancePaise) : "…"}</strong>
+                . Every change is recorded in the customer's wallet history and the audit log.
+              </p>
+              <div className="mt-2.5 space-y-3">
+                {adjustError ? <FieldError>{adjustError}</FieldError> : null}
+                <Segmented
+                  options={(Object.keys(ADJUST_LABEL) as AdjustMode[]).map((mode) => ({
+                    value: mode,
+                    label: ADJUST_LABEL[mode],
+                  }))}
+                  value={adjustMode}
+                  onChange={setAdjustMode}
+                  ariaLabel="Adjustment type"
+                />
+                <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
+                  <div>
+                    <Label htmlFor="adjust-amount" hint="Rupees">
+                      {adjustMode === "set" ? "New balance" : "Amount"}
+                    </Label>
+                    <Input
+                      id="adjust-amount"
+                      inputMode="decimal"
+                      value={adjustAmount}
+                      onChange={(event) => setAdjustAmount(event.target.value.replace(/[^\d.]/g, ""))}
+                      placeholder="e.g. 500"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="adjust-reason" hint="Shown to the customer">
+                      Reason
+                    </Label>
+                    <Input
+                      id="adjust-reason"
+                      value={adjustReason}
+                      onChange={(event) => setAdjustReason(event.target.value)}
+                      placeholder="e.g. Cash received at counter"
+                      maxLength={300}
+                    />
+                  </div>
+                </div>
+                <Button
+                  variant="gold"
+                  loading={adjusting}
+                  onClick={() => void adjustWallet()}
+                  iconLeft={<Wallet className="size-4" aria-hidden />}
+                >
+                  {ADJUST_LABEL[adjustMode]}
+                </Button>
               </div>
             </div>
 

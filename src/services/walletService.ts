@@ -20,6 +20,11 @@ export const walletService = {
     );
   },
 
+  /** Wallet documents for the admin customer list (admins only). */
+  async accounts(limit = 500): Promise<WalletAccount[]> {
+    return store.list<WalletAccount>("walletAccounts", { limit });
+  },
+
   /** The ledger is append-only and read in reverse chronological order. */
   async transactions(uid: string, limit = 100): Promise<WalletTransaction[]> {
     return store.list<WalletTransaction>("walletTransactions", {
