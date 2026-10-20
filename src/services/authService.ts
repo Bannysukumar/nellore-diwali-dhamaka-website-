@@ -50,7 +50,7 @@ export function describeAuthError(error: unknown): string {
     case "session-expired":
       return "That code has expired. Request a new OTP.";
     case "too-many-requests":
-      return "Too many attempts from this device. Please wait a few minutes before trying again.";
+      return "Too many attempts from this number or device. Firebase has paused new codes, usually for about an hour. Wait, then request one code and enter it as soon as it arrives.";
     case "quota-exceeded":
       return "We cannot send more codes right now. Please try again later.";
     case "invalid-phone-number":
