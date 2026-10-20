@@ -4,6 +4,7 @@ import { Header } from "./Header";
 import { Footer } from "./Footer";
 import { BottomNav } from "./BottomNav";
 import { SplashGate } from "./SplashGate";
+import { WhatsAppButton } from "./WhatsAppButton";
 import { ErrorBoundary } from "@/components/system/ErrorBoundary";
 
 export function ScrollToTop() {
@@ -28,6 +29,7 @@ export function PublicLayout() {
       </main>
       <Footer />
       <BottomNav />
+      <WhatsAppButton />
     </div>
   );
 }

@@ -15,7 +15,7 @@ import {
 import { useAsync } from "@/hooks/useAsync";
 import { useToast } from "@/app/ToastProvider";
 import { useAuth } from "@/app/AuthProvider";
-import { UNCONFIGURED_SETTINGS, useSettings } from "@/app/SettingsProvider";
+import { UNCONFIGURED_SETTINGS, useSettings, whatsappDigits } from "@/app/SettingsProvider";
 import { contentService } from "@/services/contentService";
 import { adminService } from "@/services/adminService";
 import { DEFAULT_SHARE_MESSAGE, renderShareMessage, rewardService } from "@/services/rewardService";
@@ -59,6 +59,8 @@ interface SettingsDraft {
   minAge: string;
   legalDisclaimer: string;
   referralShareMessage: string;
+  whatsappNumber: string;
+  whatsappMessage: string;
 }
 
 function toDraft(settings: SiteSettings): SettingsDraft {
@@ -76,6 +78,8 @@ function toDraft(settings: SiteSettings): SettingsDraft {
     minAge: String(settings.minAge),
     legalDisclaimer: settings.legalDisclaimer,
     referralShareMessage: settings.referralShareMessage ?? DEFAULT_SHARE_MESSAGE,
+    whatsappNumber: settings.whatsappNumber ?? "",
+    whatsappMessage: settings.whatsappMessage ?? "",
   };
 }
 
@@ -140,6 +144,9 @@ export function AdminSettingsPage() {
     if (current.legalDisclaimer.trim().length < 20) {
       return setError("The compliance disclaimer must be at least 20 characters.");
     }
+    if (current.whatsappNumber.trim() && !whatsappDigits(current.whatsappNumber)) {
+      return setError("Enter the WhatsApp number as 10 digits, or with the country code (e.g. +91 98765 43210).");
+    }
 
     setSaving(true);
     try {
@@ -157,6 +164,8 @@ export function AdminSettingsPage() {
         minAge,
         legalDisclaimer: current.legalDisclaimer.trim(),
         referralShareMessage: current.referralShareMessage.trim() || DEFAULT_SHARE_MESSAGE,
+        whatsappNumber: current.whatsappNumber.trim(),
+        whatsappMessage: current.whatsappMessage.trim(),
         updatedAt: new Date().toISOString(),
       };
 
@@ -380,6 +389,39 @@ export function AdminSettingsPage() {
                   value={current.supportEmail}
                   onChange={(event) => update({ supportEmail: event.target.value })}
                 />
+              </div>
+            </FormRow>
+            <FormRow columns={2}>
+              <div>
+                <Label htmlFor="set-whatsapp" hint="Leave empty to hide the button">
+                  WhatsApp button number
+                </Label>
+                <Input
+                  id="set-whatsapp"
+                  type="tel"
+                  inputMode="tel"
+                  value={current.whatsappNumber}
+                  onChange={(event) => update({ whatsappNumber: event.target.value })}
+                  placeholder="e.g. 98765 43210"
+                />
+                <p className="mt-1 text-[12px] text-muted">
+                  {whatsappDigits(current.whatsappNumber)
+                    ? `The floating WhatsApp button on public pages opens a chat with +${whatsappDigits(current.whatsappNumber)}.`
+                    : "No floating WhatsApp button is shown. Other WhatsApp links use the support phone."}
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="set-whatsapp-message" hint="Optional">
+                  First message
+                </Label>
+                <Input
+                  id="set-whatsapp-message"
+                  value={current.whatsappMessage}
+                  maxLength={300}
+                  onChange={(event) => update({ whatsappMessage: event.target.value })}
+                  placeholder="e.g. Hi, I have a question about the Diwali draw"
+                />
+                <p className="mt-1 text-[12px] text-muted">Typed into the chat for the visitor; they can edit it before sending.</p>
               </div>
             </FormRow>
             <FormRow columns={2}>

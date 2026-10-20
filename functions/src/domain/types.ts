@@ -371,6 +371,8 @@ export interface SiteSettings {
   refundWindowHours: number;
   minAge: number;
   legalDisclaimer: string;
+  whatsappNumber?: string;
+  whatsappMessage?: string;
   updatedAt: ISODate;
 }
 

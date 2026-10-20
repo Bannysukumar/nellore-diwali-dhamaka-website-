@@ -479,6 +479,10 @@ export interface SiteSettings {
   legalDisclaimer: string;
   /** "Share on WhatsApp" referral text. Supports {code}, {link} and {brand}. */
   referralShareMessage?: string;
+  /** Number behind the floating WhatsApp button; the button is hidden while empty. */
+  whatsappNumber?: string;
+  /** Text pre-filled when a visitor opens the WhatsApp chat. */
+  whatsappMessage?: string;
   updatedAt: ISODate;
 }
 

@@ -116,17 +116,32 @@ export interface SupportContact {
   phoneHref: string | null;
   email: string | null;
   whatsappUrl: string | null;
+  /** Set only when the dedicated WhatsApp number is configured (floating button). */
+  whatsappChatUrl: string | null;
 }
 
-export function supportContactFrom(settings: Pick<SiteSettings, "supportPhone" | "supportEmail">): SupportContact {
+/** wa.me needs the country code; a bare 10-digit number is taken as Indian. */
+export function whatsappDigits(input?: string): string | null {
+  const digits = (input ?? "").replace(/\D/g, "").replace(/^0+/, "");
+  if (digits.length === 10) return `91${digits}`;
+  return digits.length >= 11 && digits.length <= 15 ? digits : null;
+}
+
+export function supportContactFrom(
+  settings: Pick<SiteSettings, "supportPhone" | "supportEmail" | "whatsappNumber" | "whatsappMessage">,
+): SupportContact {
   const phone = settings.supportPhone?.trim() || null;
-  const digits = phone?.replace(/\D/g, "") ?? "";
   const email = settings.supportEmail?.trim() || null;
+  const dedicated = whatsappDigits(settings.whatsappNumber);
+  const whatsapp = dedicated ?? whatsappDigits(phone ?? "");
+  const message = settings.whatsappMessage?.trim();
+  const query = message ? `?text=${encodeURIComponent(message)}` : "";
   return {
     phone,
     phoneHref: phone ? `tel:${phone.replace(/\s/g, "")}` : null,
     email,
-    whatsappUrl: digits.length >= 10 ? `https://wa.me/${digits}` : null,
+    whatsappUrl: whatsapp ? `https://wa.me/${whatsapp}${query}` : null,
+    whatsappChatUrl: dedicated ? `https://wa.me/${dedicated}${query}` : null,
   };
 }
 
