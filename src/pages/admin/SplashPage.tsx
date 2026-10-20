@@ -46,6 +46,7 @@ interface SplashDraft {
   mobileBannerUrl: string;
   mobileBannerPath: string;
   logoUrl: string;
+  artworkOnly: boolean;
 }
 
 const DEFAULTS: SplashDraft = {
@@ -66,6 +67,7 @@ const DEFAULTS: SplashDraft = {
   mobileBannerUrl: "",
   mobileBannerPath: "",
   logoUrl: "",
+  artworkOnly: false,
 };
 
 function toLocal(iso?: string): string {
@@ -102,6 +104,7 @@ function toDraft(config: SplashConfig | null): SplashDraft {
     mobileBannerUrl: config.mobileBannerUrl ?? "",
     mobileBannerPath: config.mobileBannerPath ?? "",
     logoUrl: config.logoUrl ?? "",
+    artworkOnly: config.artworkOnly ?? false,
   };
 }
 
@@ -162,6 +165,7 @@ export function AdminSplashPage() {
         mobileBannerUrl: current.mobileBannerUrl || undefined,
         mobileBannerPath: current.mobileBannerPath || undefined,
         logoUrl: current.logoUrl || undefined,
+        artworkOnly: current.artworkOnly,
         greeting: current.greeting.trim(),
         heading: current.heading.trim(),
         description: current.description.trim(),
@@ -355,6 +359,13 @@ export function AdminSplashPage() {
                 />
               </div>
             </FormRow>
+
+            <Checkbox
+              checked={current.artworkOnly}
+              onChange={(event) => update({ artworkOnly: event.target.checked })}
+              label="Show artwork only"
+              description="For images that already contain their greeting: shows the picture uncropped with just the buttons. The heading and description become the image's text alternative."
+            />
 
             <div className="flex justify-end">
               <Button

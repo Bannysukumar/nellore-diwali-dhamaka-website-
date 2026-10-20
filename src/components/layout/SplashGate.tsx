@@ -60,6 +60,72 @@ export function SplashGate() {
     ? splash.mobileBannerUrl || splash.desktopBannerUrl
     : splash.desktopBannerUrl || splash.mobileBannerUrl;
 
+  if (splash.artworkOnly && artwork) {
+    return (
+      <AnimatePresence>
+        {visible ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.32 }}
+            className="fixed inset-0 z-[100] grid place-items-center p-4 sm:p-6"
+            style={{ backgroundColor: splash.backgroundColor || "var(--color-maroon)" }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Festival welcome"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: 18 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97 }}
+              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+              className="relative flex w-full max-w-5xl flex-col items-center gap-5"
+            >
+              <div className="relative w-full overflow-hidden rounded-[var(--radius-panel)] shadow-[var(--shadow-raised)]">
+                <img
+                  src={artwork}
+                  alt={[splash.heading, splash.description].filter(Boolean).join(". ")}
+                  className="block max-h-[75dvh] w-full object-contain"
+                />
+                {splash.allowSkip ? (
+                  <button
+                    type="button"
+                    onClick={() => dismiss(false)}
+                    aria-label="Skip and continue to the website"
+                    className="absolute right-3 top-3 rounded-lg bg-black/45 p-2 text-ivory transition hover:bg-black/65"
+                  >
+                    <X className="size-5" aria-hidden />
+                  </button>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <Button
+                  size="lg"
+                  variant="gold"
+                  onClick={() => dismiss(true)}
+                  iconRight={<ArrowRight className="size-4" aria-hidden />}
+                >
+                  {splash.ctaLabel || "Continue"}
+                </Button>
+                {splash.allowSkip ? (
+                  <Button
+                    size="lg"
+                    variant="ghost"
+                    className="text-ivory hover:bg-ivory/10"
+                    onClick={() => dismiss(false)}
+                  >
+                    Skip for now
+                  </Button>
+                ) : null}
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    );
+  }
+
   return (
     <AnimatePresence>
       {visible ? (

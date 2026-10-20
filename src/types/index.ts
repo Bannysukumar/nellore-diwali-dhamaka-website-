@@ -398,6 +398,8 @@ export interface SplashConfig {
   mobileBannerUrl?: string;
   mobileBannerPath?: string;
   logoUrl?: string;
+  /** Show the artwork uncropped with no text overlay, for images that carry their own greeting. */
+  artworkOnly?: boolean;
   greeting: string;
   heading: string;
   description: string;
