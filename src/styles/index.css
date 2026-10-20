@@ -60,8 +60,8 @@
   --dur-slow: 460ms;
 
   /* --- Layout ----------------------------------------------------------- */
-  --page-width: 1200px;
-  --page-width-wide: 1360px;
+  --page-width: 1440px;
+  --page-width-wide: 1600px;
   /* Admin console and customer dashboard: use wide screens, but keep lines readable. */
   --page-width-app: 1680px;
 }
