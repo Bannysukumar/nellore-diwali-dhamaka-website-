@@ -78,6 +78,34 @@ describe("authentication, profiles and administrator authority", () => {
     expect((await db.doc(`users/${forged.uid}`).get()).get("role")).toBe("customer");
   });
 
+  it("lets an admin grant and revoke administrator access, audited and notified", async () => {
+    const user = await registerCustomer("Future Admin");
+    expect(await call("setAdminClaim", { uid: user.uid, admin: true }, admin.token)).toEqual({
+      uid: user.uid,
+      admin: true,
+    });
+    expect((await adminAuth.getUser(user.uid)).customClaims?.role).toBe("admin");
+    expect((await db.doc(`users/${user.uid}`).get()).get("role")).toBe("admin");
+
+    await call("setAdminClaim", { uid: user.uid, admin: false }, admin.token);
+    expect((await adminAuth.getUser(user.uid)).customClaims?.role).toBeUndefined();
+    expect((await db.doc(`users/${user.uid}`).get()).get("role")).toBe("customer");
+
+    const audit = await db.collection("adminAuditLogs").where("entityId", "==", user.uid).get();
+    expect(audit.docs.map((d) => d.get("action")).sort()).toEqual(["admin.grant", "admin.revoke"]);
+    const notes = await db.collection("notifications").where("uid", "==", user.uid).get();
+    expect(notes.docs.map((d) => d.get("title"))).toEqual(
+      expect.arrayContaining(["You are now an administrator", "Administrator access removed"]),
+    );
+  });
+
+  it("refuses admin access for suspended accounts and self-demotion", async () => {
+    const user = await registerCustomer("Suspended Candidate");
+    await db.doc(`users/${user.uid}`).set({ status: "suspended" }, { merge: true });
+    expect(await callError("setAdminClaim", { uid: user.uid, admin: true }, admin.token)).toBe("FAILED_PRECONDITION");
+    expect(await callError("setAdminClaim", { uid: admin.uid, admin: false }, admin.token)).toBe("FAILED_PRECONDITION");
+  });
+
   it("blocks suspended accounts from privileged operations", async () => {
     const user = await registerCustomer("Suspended Person");
     await db.doc(`users/${user.uid}`).set({ status: "suspended" }, { merge: true });

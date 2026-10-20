@@ -250,6 +250,16 @@ export interface AdjustWalletResponse {
   balancePaise: number;
 }
 
+export interface SetAdminClaimRequest {
+  uid: string;
+  admin: boolean;
+}
+
+export interface SetAdminClaimResponse {
+  uid: string;
+  admin: boolean;
+}
+
 export interface StartViewAsRequest {
   uid: string;
 }

@@ -5,6 +5,8 @@ import {
   Coins,
   Eye,
   Search,
+  ShieldCheck,
+  ShieldOff,
   ShoppingBag,
   Sparkles,
   Ticket as TicketIcon,
@@ -25,6 +27,8 @@ import { callBackend } from "@/lib/backend/callBackend";
 import type {
   AdjustWalletRequest,
   AdjustWalletResponse,
+  SetAdminClaimRequest,
+  SetAdminClaimResponse,
   StartViewAsRequest,
   StartViewAsResponse,
 } from "@/lib/backend/api";
@@ -36,6 +40,7 @@ import {
   Card,
   CardBody,
   CardHeader,
+  ConfirmDialog,
   DataTable,
   Dialog,
   FieldError,
@@ -54,7 +59,7 @@ import { formatDate, formatDateTime, formatNumber } from "@/utils/format";
 import { initials } from "@/utils/mask";
 import { newId } from "@/utils/id";
 
-type StatusFilter = "all" | "active" | "suspended";
+type StatusFilter = "all" | "active" | "suspended" | "admins";
 type AdjustMode = AdjustWalletRequest["mode"];
 
 const ADJUST_LABEL: Record<AdjustMode, string> = {
@@ -82,9 +87,14 @@ export function AdminCustomersPage() {
   const [adjusting, setAdjusting] = useState(false);
   const adjustRequestId = useRef(newId("adj"));
   const [viewingAs, setViewingAs] = useState<string | null>(null);
+  const [roleChange, setRoleChange] = useState<"grant" | "revoke" | null>(null);
+  const [changingRole, setChangingRole] = useState(false);
 
   const customers = useAsync(
-    () => userService.listCustomers(CUSTOMER_LIST_LIMIT, filter === "all" ? undefined : filter),
+    () =>
+      filter === "admins"
+        ? userService.listAdmins()
+        : userService.listCustomers(CUSTOMER_LIST_LIMIT, filter === "all" ? undefined : filter),
     [filter],
   );
   const balances = useAsync(async () => {
@@ -214,6 +224,31 @@ export function AdminCustomersPage() {
     }
   };
 
+  const changeRole = async () => {
+    if (!selected || !roleChange) return;
+    setError(null);
+    setChangingRole(true);
+    const makeAdmin = roleChange === "grant";
+    try {
+      await callBackend<SetAdminClaimRequest, SetAdminClaimResponse>("setAdminClaim", {
+        uid: selected.uid,
+        admin: makeAdmin,
+      });
+      toast.success(
+        makeAdmin ? "Admin access given" : "Admin access removed",
+        `${selected.fullName} must sign in again for the change to apply.`,
+      );
+      setSelected({ ...selected, role: makeAdmin ? "admin" : "customer" });
+      customers.reload();
+      counts.reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Administrator access could not be changed.");
+    } finally {
+      setChangingRole(false);
+      setRoleChange(null);
+    }
+  };
+
   const columns: Array<Column<UserProfile>> = [
     {
       key: "customer",
@@ -269,6 +304,7 @@ export function AdminCustomersPage() {
           <Badge tone={row.status === "active" ? "emerald" : "danger"}>
             {row.status === "active" ? "Active" : "Suspended"}
           </Badge>
+          {row.role === "admin" ? <Badge tone="gold">Admin</Badge> : null}
         </div>
       ),
     },
@@ -375,6 +411,7 @@ export function AdminCustomersPage() {
             { value: "all", label: "All" },
             { value: "active", label: "Active" },
             { value: "suspended", label: "Suspended" },
+            { value: "admins", label: "Admins" },
           ]}
           value={filter}
           onChange={setFilter}
@@ -672,9 +709,73 @@ export function AdminCustomersPage() {
                 )}
               </div>
             </div>
+
+            <div className="rounded-xl border border-line bg-ivory/60 p-3.5">
+              <p className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-muted">
+                <ShieldCheck className="size-3.5" aria-hidden />
+                Administrator access
+              </p>
+              <div className="mt-2.5 flex flex-wrap items-center justify-between gap-3">
+                <p className="max-w-xl text-[13px] text-muted">
+                  {selected.role === "admin"
+                    ? selected.uid === admin?.uid
+                      ? "This is your own account. Another administrator must remove your access."
+                      : "This account can open the admin panel. Removing access turns it back into a customer account."
+                    : "Admins can approve payments, change wallet balances, run draws and give admin access to others. Only give it to people you trust."}
+                </p>
+                {selected.role === "admin" ? (
+                  selected.uid === admin?.uid ? (
+                    <Badge tone="gold">Admin</Badge>
+                  ) : (
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => setRoleChange("revoke")}
+                      iconLeft={<ShieldOff className="size-4" aria-hidden />}
+                    >
+                      Remove admin access
+                    </Button>
+                  )
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={selected.status !== "active"}
+                    onClick={() => setRoleChange("grant")}
+                    iconLeft={<ShieldCheck className="size-4" aria-hidden />}
+                  >
+                    Make admin
+                  </Button>
+                )}
+              </div>
+              {selected.role !== "admin" && selected.status !== "active" ? (
+                <p className="mt-2 text-[12px] text-muted">Reactivate the account before giving it admin access.</p>
+              ) : null}
+            </div>
           </div>
         ) : null}
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(roleChange && selected)}
+        onClose={() => setRoleChange(null)}
+        onConfirm={() => void changeRole()}
+        busy={changingRole}
+        tone={roleChange === "grant" ? "primary" : "danger"}
+        title={
+          roleChange === "grant"
+            ? `Make ${selected?.fullName ?? "this user"} an admin?`
+            : `Remove admin access from ${selected?.fullName ?? "this user"}?`
+        }
+        description="This change is recorded in the audit log and the person is notified."
+        confirmLabel={roleChange === "grant" ? "Make admin" : "Remove admin access"}
+      >
+        <p className="text-[13px] leading-relaxed text-muted">
+          {roleChange === "grant"
+            ? "They will be able to see every customer's details, approve payments, change wallet balances, run draws and give admin access to others. Their current sessions are signed out; they get the admin panel after signing in again."
+            : "They will lose access to the admin panel. Their current sessions are signed out; their wallet and tickets are kept."}
+        </p>
+      </ConfirmDialog>
     </>
   );
 }

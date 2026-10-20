@@ -8,6 +8,7 @@ import {
   clean,
   db,
   enforceRateLimit,
+  notify,
   requireUser,
 } from "./firestore.js";
 import {
@@ -43,9 +44,13 @@ export const setAdminClaim = onCall<unknown>(CALLABLE_OPTIONS, async (request) =
   if (caller.uid === uid && !admin) {
     failedPrecondition("You cannot remove your own administrator access.");
   }
+  await enforceRateLimit(caller.uid, "setAdminClaim", { max: 20, windowSeconds: 3600 });
 
   const targetSnap = await db().collection(COLLECTIONS.users).doc(uid).get();
   if (!targetSnap.exists) failedPrecondition("That user does not exist.");
+  if (admin && targetSnap.get("status") !== "active") {
+    failedPrecondition("Reactivate this account before giving it administrator access.");
+  }
 
   const auth = getAuth();
   const user = await auth.getUser(uid);
@@ -68,6 +73,16 @@ export const setAdminClaim = onCall<unknown>(CALLABLE_OPTIONS, async (request) =
     COLLECTIONS.users,
     uid,
     admin ? "Granted administrator access." : "Revoked administrator access.",
+    { role: user.customClaims?.role === "admin" ? "admin" : "customer" },
+    { role: admin ? "admin" : "customer" },
+  );
+  await notify(
+    uid,
+    "system",
+    admin ? "You are now an administrator" : "Administrator access removed",
+    admin
+      ? `${caller.fullName} gave your account administrator access. Sign in again to open the admin panel.`
+      : `${caller.fullName} removed administrator access from your account. Sign in again to continue.`,
   );
 
   return { uid, admin };

@@ -62,6 +62,14 @@ export const userService = {
     });
   },
 
+  async listAdmins(limit = 100): Promise<UserProfile[]> {
+    return store.list<UserProfile>("users", {
+      where: [{ field: "role", op: "==", value: "admin" }],
+      orderBy: [{ field: "createdAt", dir: "desc" }],
+      limit,
+    });
+  },
+
   async customer(uid: string): Promise<UserProfile | null> {
     return store.get<UserProfile>("users", uid);
   },

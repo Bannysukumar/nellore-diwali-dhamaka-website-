@@ -80,6 +80,7 @@ export const BACKEND_FUNCTIONS = [
   "broadcastAnnouncement",
   "adjustWallet",
   "startViewAs",
+  "setAdminClaim",
   "findTransferRecipient",
   "transferFunds",
   "getProductCoupons",
