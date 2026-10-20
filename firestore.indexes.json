@@ -93,6 +93,22 @@
       ]
     },
     {
+      "collectionGroup": "depositRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "amountPaise", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "depositRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "verifiedAmountPaise", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "spinTransactions",
       "queryScope": "COLLECTION",
       "fields": [
@@ -203,6 +219,31 @@
       "fields": [
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "orders",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "totalPaise", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "orders",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "quantity", "order": "ASCENDING" },
+        { "fieldPath": "totalPaise", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "walletTransactions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "direction", "order": "ASCENDING" },
+        { "fieldPath": "amountPaise", "order": "ASCENDING" }
       ]
     },
     {
