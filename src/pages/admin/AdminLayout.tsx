@@ -143,12 +143,12 @@ export function AdminLayout() {
       <ScrollToTop />
       {IS_EMULATOR ? (
         <div className="bg-maroon-deep text-[11px] font-semibold uppercase tracking-[0.14em] text-gold-soft">
-          <p className="page py-1.5 text-center">Admin · {EMULATOR_NOTICE}</p>
+          <p className="page-app py-1.5 text-center">Admin · {EMULATOR_NOTICE}</p>
         </div>
       ) : null}
 
       <header className="sticky top-0 z-50 border-b border-line bg-paper/95 backdrop-blur-md">
-        <div className="page flex h-16 items-center justify-between gap-4">
+        <div className="page-app flex h-16 items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -208,7 +208,7 @@ export function AdminLayout() {
             onClick={menu.close}
           />
           <div className="relative max-h-full overflow-y-auto overscroll-contain border-b border-line bg-paper shadow-[var(--shadow-card)]">
-            <div className="page space-y-4 py-4">
+            <div className="page-app space-y-4 py-4">
               {pendingCard}
               {sidebar}
               <div className="grid grid-cols-2 gap-2 border-t border-line pt-3 sm:hidden">
@@ -231,7 +231,7 @@ export function AdminLayout() {
         </div>
       ) : null}
 
-      <div className="page grid grid-cols-[minmax(0,1fr)] gap-6 py-6 lg:grid-cols-[248px_minmax(0,1fr)]">
+      <div className="page-app grid grid-cols-[minmax(0,1fr)] gap-6 py-6 lg:grid-cols-[248px_minmax(0,1fr)]">
         <aside className="hidden lg:block">
           <div className="sticky top-20 max-h-[calc(100dvh-6rem)] space-y-4 overflow-y-auto overscroll-contain pb-2 pr-1">
             {pendingCard}
@@ -245,7 +245,7 @@ export function AdminLayout() {
       </div>
 
       <footer className="border-t border-line bg-paper px-4 py-4">
-        <div className="page flex flex-wrap items-center justify-between gap-2 text-[12px] text-muted">
+        <div className="page-app flex flex-wrap items-center justify-between gap-2 text-[12px] text-muted">
           <span>
             Signed in as {profile?.fullName ?? "Administrator"} · every privileged action is written to the
             audit log.

@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { LogOut, Menu, ShieldCheck, User, Wallet, X } from "lucide-react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/app/AuthProvider";
 import { useSettings } from "@/app/SettingsProvider";
 import { useMobileMenu } from "@/hooks/useMobileMenu";
@@ -23,6 +23,8 @@ export function Header() {
   const { user, profile, isAdmin, signOut } = useAuth();
   const { error: settingsError, reload: reloadSettings } = useSettings();
   const { open, setOpen, toggle } = useMobileMenu();
+  /** The dashboard uses the wider app container; match it so the logo lines up. */
+  const container = useLocation().pathname.startsWith("/dashboard") ? "page-app" : "page";
 
   return (
     <>
@@ -43,7 +45,7 @@ export function Header() {
       ) : null}
 
       <header className="sticky top-0 z-50 border-b border-line bg-ivory/85 backdrop-blur-md">
-        <div className="page flex h-16 items-center justify-between gap-4">
+        <div className={cn(container, "flex h-16 items-center justify-between gap-4")}>
           <Logo />
 
           <nav aria-label="Primary" className="hidden items-center gap-1 lg:flex">
@@ -133,7 +135,7 @@ export function Header() {
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
               className="max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-line bg-paper lg:hidden"
             >
-              <nav aria-label="Mobile" className="page grid gap-1 py-3">
+              <nav aria-label="Mobile" className={cn(container, "grid gap-1 py-3")}>
                 {NAV.map((item) => (
                   <NavLink
                     key={item.to}
