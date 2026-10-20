@@ -16,6 +16,25 @@ import { Alert, Button, Input, Label, Spinner } from "@/components/ui";
 import { maskPhone } from "@/utils/mask";
 
 const RECAPTCHA_CONTAINER_ID = "auth-recaptcha-container";
+const OTP_LENGTH = 6;
+
+/**
+ * Chrome on Android (WebOTP): resolves with the code from an incoming SMS
+ * once the user taps "Allow". Never resolves when the SMS is not bound to
+ * this site, so it is always paired with an abort signal.
+ */
+async function readSmsCode(signal: AbortSignal): Promise<string | null> {
+  if (typeof window === "undefined" || !("OTPCredential" in window)) return null;
+  try {
+    const credential = (await navigator.credentials.get({
+      otp: { transport: ["sms"] },
+      signal,
+    } as CredentialRequestOptions)) as (Credential & { code?: string }) | null;
+    return credential?.code?.replace(/\D/g, "") || null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Shared phone + OTP step machine used by both sign-in and registration.
@@ -42,8 +61,12 @@ export function PhoneOtpAuth({
   const [error, setError] = useState<string | null>(null);
   const [issuedTo, setIssuedTo] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
+  const [sendCount, setSendCount] = useState(0);
   const verificationId = useRef<string | null>(null);
   const otpRef = useRef<HTMLInputElement>(null);
+  const verifying = useRef(false);
+  const autoSubmitted = useRef<string | null>(null);
+  const enterCodeRef = useRef<(value: string) => void>(() => {});
 
   useEffect(() => () => resetRecaptcha(), []);
 
@@ -80,6 +103,8 @@ export function PhoneOtpAuth({
       setCooldown(OTP_RESEND_COOLDOWN_SECONDS);
       setStep("otp");
       setCode("");
+      autoSubmitted.current = null;
+      setSendCount((n) => n + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not send the OTP. Please try again.");
     } finally {
@@ -87,26 +112,52 @@ export function PhoneOtpAuth({
     }
   };
 
-  const verify = async () => {
+  const verify = async (entered = code) => {
     setError(null);
     if (!verificationId.current) {
       setError("No OTP is pending. Request a new code.");
       return;
     }
-    if (code.trim().length < 4) {
+    if (entered.trim().length < 4) {
       setError("Enter the OTP you received.");
       return;
     }
+    if (verifying.current) return;
+    verifying.current = true;
     setBusy(true);
     try {
-      const result = await confirmOtp(verificationId.current, code.trim(), draft ?? undefined);
+      const result = await confirmOtp(verificationId.current, entered.trim(), draft ?? undefined);
       onCompleted(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Verification failed. Please try again.");
     } finally {
+      verifying.current = false;
       setBusy(false);
     }
   };
+
+  /** A full code (typed, pasted, or picked from the keyboard's SMS suggestion) submits itself once. */
+  const enterCode = (value: string) => {
+    const digits = value.replace(/\D/g, "").slice(0, OTP_LENGTH);
+    setCode(digits);
+    if (digits.length === OTP_LENGTH && autoSubmitted.current !== digits) {
+      autoSubmitted.current = digits;
+      void verify(digits);
+    }
+  };
+
+  useEffect(() => {
+    enterCodeRef.current = enterCode;
+  });
+
+  useEffect(() => {
+    if (step !== "otp" || !sendCount) return;
+    const controller = new AbortController();
+    void readSmsCode(controller.signal).then((smsCode) => {
+      if (smsCode && !controller.signal.aborted) enterCodeRef.current(smsCode);
+    });
+    return () => controller.abort();
+  }, [step, sendCount]);
 
   return (
     <div className="space-y-4">
@@ -152,7 +203,8 @@ export function PhoneOtpAuth({
       ) : (
         <div className="space-y-4">
           <p className="text-[13px] text-muted">
-            Code sent to <span className="font-semibold text-ink">{issuedTo ? maskPhone(issuedTo) : ""}</span>
+            Code sent to <span className="font-semibold text-ink">{issuedTo ? maskPhone(issuedTo) : ""}</span>.
+            Your phone may offer to fill in the code from the SMS; it is checked as soon as all 6 digits are in.
           </p>
 
           <div className="space-y-1.5">
@@ -165,12 +217,12 @@ export function PhoneOtpAuth({
               type="text"
               inputMode="numeric"
               autoComplete="one-time-code"
-              maxLength={6}
+              maxLength={OTP_LENGTH}
               placeholder="6-digit code"
               prefix={<KeyRound className="size-4" aria-hidden />}
               value={code}
               invalid={Boolean(error)}
-              onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))}
+              onChange={(event) => enterCode(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") void verify();
               }}
