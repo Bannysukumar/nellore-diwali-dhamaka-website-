@@ -63,10 +63,7 @@ Do these in the Firebase / Google Cloud console for the target project.
    `functions/src/firestore.ts`) and Firestore **triggers** run in
    `us-central1`, next to it: every callable makes several sequential database
    round trips, which are slow from a distant region. Scheduled jobs use the
-   default in `functions/src/bootstrap.ts`. Callables are also deployed to
-   `asia-south1` for web builds released before the move; once every server has
-   been rebuilt, drop it from `CALLABLE_REGIONS` and deploy with `--force` so
-   the CLI deletes the Mumbai copies. During busy sales periods an
+   default in `functions/src/bootstrap.ts`. During busy sales periods an
    administrator can switch on **Settings → Speed → Keep customer actions
    fast**; `keepCallablesWarm` then pings the customer callables every five
    minutes so they rarely cold-start.

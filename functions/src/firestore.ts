@@ -25,10 +25,9 @@ import { nowIso } from "./domain/shared.js";
 /**
  * Callables run in `us-central1`, next to the `nam5` Firestore database: a
  * callable makes several sequential database round trips, and from Mumbai each
- * one crossed to the US. `asia-south1` stays deployed only until every web build
- * in use calls `us-central1`; then remove it and redeploy with `--force`.
+ * one crossed to the US. The web client calls this region (`src/lib/firebase/client.ts`).
  */
-export const CALLABLE_REGIONS = ["us-central1", "asia-south1"];
+export const CALLABLE_REGIONS = ["us-central1"];
 
 /**
  * Options shared by every callable. App Check is opt-in through
