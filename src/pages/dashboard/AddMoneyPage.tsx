@@ -94,6 +94,14 @@ function clearDepositSession() {
 
 const appLabel = (id: string) => UPI_APPS.find((app) => app.id === id)?.name ?? "your UPI app";
 
+interface LaunchProblem {
+  title: string;
+  message: string;
+}
+
+const OTHER_WAYS =
+  "Try another app or “All UPI apps”, or open your UPI app yourself and pay to the UPI ID above (it is copied for you) or scan the QR code.";
+
 export function AddMoneyPage() {
   const { uid, profile } = useAuth();
   const settings = useSiteSettings();
@@ -120,9 +128,12 @@ export function AddMoneyPage() {
   const [returnedFrom, setReturnedFrom] = useState<string | null>(
     returnedAfterReload ? (restored?.launchedApp ?? null) : null,
   );
-  const [launchProblem, setLaunchProblem] = useState<string | null>(
+  const [launchProblem, setLaunchProblem] = useState<LaunchProblem | null>(
     missingAppId
-      ? `${appLabel(missingAppId)} is not installed on this phone. Choose another app, or pay using the UPI ID or QR code.`
+      ? {
+          title: "App did not open",
+          message: `${appLabel(missingAppId)} could not be opened from this browser — it may not be installed, or this phone's browser does not allow it. ${OTHER_WAYS}`,
+        }
       : null,
   );
   const [copied, setCopied] = useState<string | null>(null);
@@ -189,7 +200,17 @@ export function AddMoneyPage() {
   /* Coming back from the UPI app — whether it paid or not — lands on the proof step. */
   useEffect(() => {
     if (!launchedApp) return;
+    const name = appLabel(launchedApp);
+    const startedAt = Date.now();
     let leftAt: number | null = null;
+    let bounced = false;
+
+    const returned = () => {
+      setReturnedFrom(launchedApp);
+      setLaunchedApp(null);
+      setLaunchProblem(null);
+      setStep("evidence");
+    };
     const away = () => {
       if (leftAt === null) leftAt = Date.now();
     };
@@ -197,29 +218,42 @@ export function AddMoneyPage() {
       if (leftAt === null) return;
       const awayMs = Date.now() - leftAt;
       leftAt = null;
-      if (awayMs < MIN_AWAY_MS) return;
-      setReturnedFrom(launchedApp);
-      setLaunchedApp(null);
-      setLaunchProblem(null);
-      setStep("evidence");
+      if (awayMs >= MIN_AWAY_MS) return returned();
+      // The system chooser closes this fast when cancelled; a named app doing so rejected the link.
+      // Keep listening: an "Open in app?" prompt also returns quickly, and the app may still open.
+      if (launchedApp === "any") return;
+      bounced = true;
+      setLaunchProblem({
+        title: `${name} closed straight away`,
+        message: `Some UPI apps — especially older versions — stop payments that start from a website and send you back. Update ${name}, or: ${OTHER_WAYS}`,
+      });
     };
     const onVisibility = () => (document.visibilityState === "hidden" ? away() : back());
+
     const timer = window.setTimeout(() => {
-      if (leftAt === null && document.visibilityState === "visible") {
-        setLaunchProblem(
-          `If ${appLabel(launchedApp)} did not open, it may not be installed. Choose another app, or pay using the UPI ID or QR code.`,
-        );
-        setLaunchedApp(null);
-      }
+      if (bounced || leftAt !== null || document.visibilityState === "hidden") return;
+      // Older browsers freeze the page without reporting it hidden; a timer that fires
+      // late means the page was frozen while the app was in front.
+      if (Date.now() - startedAt - LAUNCH_TIMEOUT_MS >= MIN_AWAY_MS) return returned();
+      setLaunchedApp(null);
+      setLaunchProblem({
+        title: "App did not open",
+        message: `${name} did not open. It may not be installed, or this browser blocked it. ${OTHER_WAYS}`,
+      });
     }, LAUNCH_TIMEOUT_MS);
+
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("blur", away);
     window.addEventListener("focus", back);
+    window.addEventListener("pagehide", away);
+    window.addEventListener("pageshow", back);
     return () => {
       window.clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("blur", away);
       window.removeEventListener("focus", back);
+      window.removeEventListener("pagehide", away);
+      window.removeEventListener("pageshow", back);
     };
   }, [launchedApp]);
 
@@ -230,6 +264,7 @@ export function AddMoneyPage() {
     setReturnedFrom(null);
     setLaunchedApp(appId);
     saveSession({ launchedApp: appId });
+    void copyText(qr.upiId);
     window.location.href = upiLaunchUrl(
       app,
       platform,
@@ -542,8 +577,8 @@ export function AddMoneyPage() {
                   )}
 
                   {launchProblem ? (
-                    <Alert tone="warning" title="App did not open">
-                      {launchProblem}
+                    <Alert tone="warning" title={launchProblem.title}>
+                      {launchProblem.message}
                     </Alert>
                   ) : null}
 
