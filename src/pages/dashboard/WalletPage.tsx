@@ -20,6 +20,7 @@ import {
   type Column,
 } from "@/components/ui";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { ReferralLinkCard } from "@/features/referrals/ReferralLinkCard";
 import { formatINR, formatINRCompact } from "@/utils/money";
 import { formatDateTime } from "@/utils/format";
 import { maskUtr } from "@/utils/mask";
@@ -207,11 +208,14 @@ export function WalletPage() {
         />
       </div>
 
-      <Alert tone="info" className="mt-4" title="How deposits work">
-        Minimum deposit {formatINR(settings.minDepositPaise)}, maximum{" "}
-        {formatINR(settings.maxDepositPaise)} per request. Uploading a screenshot does not complete a
-        deposit — verification does.
-      </Alert>
+      <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <Alert tone="info" title="How deposits work">
+          Minimum deposit {formatINR(settings.minDepositPaise)}, maximum{" "}
+          {formatINR(settings.maxDepositPaise)} per request. Uploading a screenshot does not complete a
+          deposit — verification does.
+        </Alert>
+        <ReferralLinkCard />
+      </div>
 
       <div className="mt-5">
         <Segmented
