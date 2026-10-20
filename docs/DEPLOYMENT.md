@@ -59,13 +59,14 @@ Do these in the Firebase / Google Cloud console for the target project.
    ```bash
    firebase firestore:databases:get "(default)" --project uwgea32
    ```
-   All functions run in `asia-south1` (set in `functions/src/bootstrap.ts`).
-   Firestore **triggers** (`auditAdminContent`, `auditTicketBlocks`,
-   `auditAccountStatus`, `onDrawWritten`) must be deployed in a region
-   compatible with the database location. If the database is not in
-   `asia-south1`, either recreate it there (only possible while it is empty) or
-   give the triggers an explicit `region` matching the database location before
-   deploying. The deploy fails with a clear error if they are incompatible.
+   The production database is in `nam5`. Callables (`CALLABLE_REGIONS` in
+   `functions/src/firestore.ts`) and Firestore **triggers** run in
+   `us-central1`, next to it: every callable makes several sequential database
+   round trips, which are slow from a distant region. Scheduled jobs use the
+   default in `functions/src/bootstrap.ts`. Callables are also deployed to
+   `asia-south1` for web builds released before the move; once every server has
+   been rebuilt, drop it from `CALLABLE_REGIONS` and deploy with `--force` so
+   the CLI deletes the Mumbai copies.
 4. **Storage**: create the default bucket, then apply the CORS policy so the
    admin console can stream private payment screenshots with the signed-in
    admin's credentials:

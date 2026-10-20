@@ -24,6 +24,11 @@ export function SplashGate() {
   const isMobile = useMediaQuery("(max-width: 767px)");
   const navigate = useNavigate();
   const brandName = settings?.brandName ?? "Nellore Diwali Dhamaka";
+  const artwork = splash
+    ? isMobile
+      ? splash.mobileBannerUrl || splash.desktopBannerUrl
+      : splash.desktopBannerUrl || splash.mobileBannerUrl
+    : "";
 
   useEffect(() => {
     if (!splash || !contentService.isSplashActive(splash)) {
@@ -42,10 +47,40 @@ export function SplashGate() {
         return;
       }
     }
-    // Short delay keeps the splash from flashing during first paint.
-    const id = window.setTimeout(() => setVisible(true), 250);
-    return () => window.clearTimeout(id);
-  }, [splash]);
+    if (!artwork) {
+      // Short delay keeps the splash from flashing during first paint.
+      const id = window.setTimeout(() => setVisible(true), 250);
+      return () => window.clearTimeout(id);
+    }
+
+    /*
+     * The splash opens once its artwork has downloaded, so it never appears as
+     * an empty or half-painted frame. Artwork-only splashes are skipped for this
+     * visit when the image is too slow, rather than covering a page already in use.
+     */
+    let settled = false;
+    const image = new Image();
+    const show = () => {
+      if (settled) return;
+      settled = true;
+      setVisible(true);
+    };
+    const giveUp = window.setTimeout(() => {
+      if (splash.artworkOnly) settled = true;
+      else show();
+    }, 6000);
+    image.onload = show;
+    image.onerror = () => {
+      if (!splash.artworkOnly) show();
+    };
+    image.src = artwork;
+    return () => {
+      settled = true;
+      window.clearTimeout(giveUp);
+      image.onload = null;
+      image.onerror = null;
+    };
+  }, [splash, artwork]);
 
   const dismiss = (followCta = false) => {
     setVisible(false);
@@ -55,10 +90,6 @@ export function SplashGate() {
   };
 
   if (!splash) return null;
-
-  const artwork = isMobile
-    ? splash.mobileBannerUrl || splash.desktopBannerUrl
-    : splash.desktopBannerUrl || splash.mobileBannerUrl;
 
   if (splash.artworkOnly && artwork) {
     return (

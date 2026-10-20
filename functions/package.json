@@ -6,7 +6,7 @@
   "description": "Privileged server-side operations for Nellore Diwali Dhamaka. All money-sensitive writes happen here and nowhere else.",
   "main": "lib/index.js",
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "scripts": {
     "build": "tsc",

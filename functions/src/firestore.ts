@@ -23,11 +23,20 @@ import { notFound, permissionDenied, resourceExhausted, unauthenticated } from "
 import { nowIso } from "./domain/shared.js";
 
 /**
+ * Callables run in `us-central1`, next to the `nam5` Firestore database: a
+ * callable makes several sequential database round trips, and from Mumbai each
+ * one crossed to the US. `asia-south1` stays deployed only until every web build
+ * in use calls `us-central1`; then remove it and redeploy with `--force`.
+ */
+export const CALLABLE_REGIONS = ["us-central1", "asia-south1"];
+
+/**
  * Options shared by every callable. App Check is opt-in through
  * `ENFORCE_APP_CHECK=true` in `functions/.env` so local emulator runs and the
  * first deployment work before an App Check provider has been registered.
  */
 export const CALLABLE_OPTIONS: CallableOptions = {
+  region: CALLABLE_REGIONS,
   enforceAppCheck: process.env.ENFORCE_APP_CHECK === "true",
 };
 

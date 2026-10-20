@@ -25,7 +25,7 @@ import { nowIso } from "./domain/shared.js";
 /**
  * Firestore triggers must run in a region compatible with the database
  * location. The production database is in the `nam5` multi-region, which pairs
- * with `us-central1`; callables stay in `asia-south1` (see `bootstrap.ts`).
+ * with `us-central1`.
  */
 const TRIGGER_REGION = "us-central1";
 

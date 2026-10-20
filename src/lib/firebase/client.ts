@@ -115,7 +115,7 @@ export function firebaseStorage(): FirebaseStorage {
 
 export function cloudFunctions(): Functions {
   if (!functions) {
-    functions = getFunctions(ensureApp(), "asia-south1");
+    functions = getFunctions(ensureApp(), "us-central1");
     if (IS_EMULATOR) {
       connectFunctionsEmulator(functions, EMULATOR_HOST, EMULATOR_PORTS.functions);
     }

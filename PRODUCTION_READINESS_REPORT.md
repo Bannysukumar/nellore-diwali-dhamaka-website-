@@ -32,7 +32,7 @@
 | Firestore data access | **Wired** | `src/lib/backend/firestoreStore.ts` + `src/lib/backend/index.ts`. All domain reads via `Store`. |
 | Cloud Storage | **Wired** | `src/services/storageService.ts` — upload/download/delete with demo guards (no-op/returns null). |
 | Cloud Functions (callable) | **Wired** | `src/lib/backend/callBackend.ts` → `httpsCallable(cloudFunctions(), name)` in non-demo, strips `functions/` prefix, normalises errors. Contract matches `functions/src/index.ts`. |
-| Region / runtime | **Verified** | Functions region `asia-south1`, Node 20 (`functions/package.json`). |
+| Region / runtime | **Verified** | Callables and triggers in `us-central1` beside the `nam5` database, Node 22 (`functions/package.json`). |
 | Admin claims | **Enforced server-side** | Firestore rules require `request.auth.token.role == 'admin'`; Cloud Functions enforce auth/authorisation; `tools/setAdmin.mjs` bootstraps first admin via custom claim. UI `RequireAdmin` is a UX guard only. |
 | Idempotency / transactions / ledger | **Implemented server-side** | `functions/src/*` uses Firestore transactions, append-only ledger via `firestore.ts::writeLedger`, `requestId` idempotency, duplicate UTR detection, etc. (mirrored in `src/lib/demo/functions.ts`). |
 

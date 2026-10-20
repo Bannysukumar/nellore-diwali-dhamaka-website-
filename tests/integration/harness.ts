@@ -17,7 +17,7 @@ const AUTH_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST ?? "";
 const FIRESTORE_HOST = process.env.FIRESTORE_EMULATOR_HOST ?? "";
 const STORAGE_HOST = process.env.FIREBASE_STORAGE_EMULATOR_HOST ?? "";
 const FUNCTIONS_HOST = process.env.FUNCTIONS_EMULATOR_HOST ?? "127.0.0.1:5001";
-const REGION = "asia-south1";
+const REGION = "us-central1";
 const LOOPBACK = /^(127\.0\.0\.1|localhost|\[::1\]):\d+$/;
 
 if (!PROJECT.startsWith("demo-")) throw new Error(`Refusing to run integration tests against "${PROJECT}".`);

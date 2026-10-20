@@ -75,14 +75,8 @@ export const drawService = {
 
   /** Ticket inventory snapshot for one draw. */
   async stats(drawId: string): Promise<DrawStats> {
-    const [total, available, pending, booked, blocked] = await Promise.all([
+    const [total, pending, booked, blocked] = await Promise.all([
       store.count("tickets", { where: [{ field: "drawId", op: "==", value: drawId }] }),
-      store.count("tickets", {
-        where: [
-          { field: "drawId", op: "==", value: drawId },
-          { field: "status", op: "==", value: "available" },
-        ],
-      }),
       store.count("tickets", {
         where: [
           { field: "drawId", op: "==", value: drawId },
@@ -104,7 +98,7 @@ export const drawService = {
     ]);
     return {
       total,
-      available,
+      available: Math.max(0, total - pending - booked - blocked),
       pending,
       booked,
       blocked,

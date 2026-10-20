@@ -16,6 +16,37 @@ const ALLOWED = ["image/png", "image/jpeg", "image/webp", "image/heic"];
 /** Folders whose contents are private financial evidence. */
 const PRIVATE_FOLDERS = new Set(["deposit-screenshots"]);
 
+/** Public artwork every visitor downloads; QR codes and evidence keep their original pixels. */
+const OPTIMISED_FOLDERS = new Set(["splash", "banners", "products"]);
+const OPTIMISED_MAX_EDGE = 1920;
+const OPTIMISED_QUALITY = 0.82;
+
+/**
+ * Downscales and re-encodes artwork as WebP. Returns the original file when the
+ * browser cannot decode or encode it, or when re-encoding would not shrink it.
+ */
+export async function optimiseImage(file: File): Promise<Blob> {
+  if (typeof createImageBitmap !== "function") return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, OPTIMISED_MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/webp", OPTIMISED_QUALITY),
+    );
+    if (!blob || blob.type !== "image/webp" || blob.size >= file.size) return file;
+    return blob;
+  } catch {
+    return file;
+  }
+}
+
 export function validateImage(file: File): string | null {
   if (!ALLOWED.includes(file.type)) {
     return "Upload a PNG, JPEG or WebP image.";
@@ -35,7 +66,11 @@ export async function uploadImage(
   const problem = validateImage(file);
   if (problem) throw new Error(problem);
 
-  const extension = (file.name.split(".").pop()?.toLowerCase() || "png").replace(/[^a-z0-9]/g, "") || "png";
+  const body = OPTIMISED_FOLDERS.has(folder) ? await optimiseImage(file) : file;
+  const extension =
+    body !== file
+      ? "webp"
+      : (file.name.split(".").pop()?.toLowerCase() || "png").replace(/[^a-z0-9]/g, "") || "png";
   const path = `${folder}/${ownerUid}/${newId("f")}.${extension}`;
 
   const [{ ref, uploadBytes, getDownloadURL }, { firebaseStorage }] = await Promise.all([
@@ -43,7 +78,11 @@ export async function uploadImage(
     import("@/lib/firebase/client"),
   ]);
   const storageRef = ref(firebaseStorage(), path);
-  await uploadBytes(storageRef, file, { contentType: file.type });
+  await uploadBytes(storageRef, body, {
+    contentType: body.type || file.type,
+    /* Every upload gets a fresh name, so public artwork can be cached for 30 days. */
+    ...(OPTIMISED_FOLDERS.has(folder) ? { cacheControl: "public, max-age=2592000" } : {}),
+  });
   if (PRIVATE_FOLDERS.has(folder)) return { path, url: "" };
   const url = await getDownloadURL(storageRef);
   return { path, url };

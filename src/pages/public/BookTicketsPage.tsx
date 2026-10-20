@@ -102,6 +102,8 @@ export function BookTicketsPage() {
   const requested = params.get("draw");
   const packageQty = Number(params.get("qty") ?? "");
   const selectedDrawId = requested && publicDraws.some((d) => d.id === requested) ? requested : "";
+  /* A linked draw's numbers load alongside the draw list rather than after it. */
+  const inventoryDrawId = requested && (draws.loading || selectedDrawId === requested) ? requested : "";
 
   const draw = publicDraws.find((d) => d.id === selectedDrawId) ?? null;
   const bookingPath = draw ? `/book?draw=${encodeURIComponent(draw.id)}` : "/book";
@@ -117,8 +119,8 @@ export function BookTicketsPage() {
   const canPurchase = Boolean(draw && draw.status === "open" && settings.allowPaidDraws && !readOnly);
 
   const stats = useAsync(
-    async () => (draw ? await drawService.stats(draw.id) : null),
-    [draw?.id, selectedDrawId],
+    async () => (inventoryDrawId ? await drawService.stats(inventoryDrawId) : null),
+    [inventoryDrawId],
   );
 
   const [filter, setFilter] = useState<Filter>("all");
@@ -157,9 +159,12 @@ export function BookTicketsPage() {
     setSearchResults([]);
   }, [selectedDrawId]);
 
+  /* Only the "My tickets" filter depends on who is signed in. */
+  const gridOwnerUid = filter === "mine" ? user?.uid : undefined;
+
   /* First page of the grid, or the recently-sold snapshot. */
   useEffect(() => {
-    if (!selectedDrawId) {
+    if (!inventoryDrawId) {
       setTickets([]);
       setLoading(false);
       return;
@@ -171,7 +176,7 @@ export function BookTicketsPage() {
     const load = async () => {
       try {
         if (filter === "recent") {
-          const rows = await ticketService.recentlySold(selectedDrawId, 60);
+          const rows = await ticketService.recentlySold(inventoryDrawId, 60);
           if (!cancelled) {
             setTickets(rows);
             setHasMore(false);
@@ -180,9 +185,9 @@ export function BookTicketsPage() {
           return;
         }
         const result = await ticketService.page({
-          drawId: selectedDrawId,
+          drawId: inventoryDrawId,
           status: filter,
-          ownerUid: user?.uid,
+          ownerUid: gridOwnerUid,
           limit: PAGE_SIZE,
         });
         if (!cancelled) {
@@ -203,7 +208,7 @@ export function BookTicketsPage() {
     return () => {
       cancelled = true;
     };
-  }, [selectedDrawId, filter, user?.uid, refreshKey]);
+  }, [inventoryDrawId, filter, gridOwnerUid, refreshKey]);
 
   /* Exact-number search is served by the paginated inventory, never by a full read. */
   useEffect(() => {

@@ -2,7 +2,7 @@ import { BackendError, type BackendErrorShape } from "./api";
 
 /**
  * Single entry point for every privileged operation: a Cloud Functions
- * callable in `asia-south1`. Feature code must never mutate wallets, tickets,
+ * callable in `us-central1`, next to the Firestore database. Feature code must never mutate wallets, tickets,
  * spins or draw results through the store directly.
  */
 export async function callBackend<TReq, TRes>(name: BackendFunctionName, payload: TReq): Promise<TRes> {

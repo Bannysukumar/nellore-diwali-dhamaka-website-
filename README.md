@@ -157,8 +157,8 @@ npm run build
 firebase deploy --only firestore:rules,firestore:indexes,storage,functions,hosting
 ```
 
-Regions and runtime: all functions run in **`asia-south1`** (Mumbai) on
-**Node 20**.
+Regions and runtime: callables and Firestore triggers run in **`us-central1`**,
+next to the `nam5` Firestore database, on **Node 22** (see `docs/DEPLOYMENT.md`).
 
 ### 4. Seed the settings documents
 
