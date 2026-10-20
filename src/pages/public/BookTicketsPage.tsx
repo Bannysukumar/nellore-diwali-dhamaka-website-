@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArrowLeftRight,
+  ArrowRight,
   CheckCircle2,
   LayoutGrid,
   Loader2,
@@ -35,13 +37,13 @@ import {
   ErrorState,
   Input,
   Segmented,
-  Select,
   Skeleton,
 } from "@/components/ui";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { TicketCounters, TicketGrid } from "@/features/tickets/TicketGrid";
 import { DrawStatusBadge } from "@/features/draws/DrawMeta";
-import { formatINR } from "@/utils/money";
+import { DrawPrizeCard } from "@/features/draws/DrawPrizeCard";
+import { formatINR, formatINRPlain } from "@/utils/money";
 import { formatNumber } from "@/utils/format";
 import { newId } from "@/utils/id";
 
@@ -88,15 +90,28 @@ export function BookTicketsPage() {
   const publicDraws = useMemo(() => draws.data ?? [], [draws.data]);
   const openDraws = useMemo(() => publicDraws.filter((d) => d.status === "open"), [publicDraws]);
 
+  const choosableDraws = useMemo(
+    () =>
+      [...(openDraws.length ? openDraws : publicDraws)].sort(
+        (a, b) => a.ticketPricePaise - b.ticketPricePaise,
+      ),
+    [openDraws, publicDraws],
+  );
+
   const requested = params.get("draw");
   const packageQty = Number(params.get("qty") ?? "");
-  const selectedDrawId =
-    (requested && publicDraws.some((d) => d.id === requested) ? requested : null) ??
-    openDraws[0]?.id ??
-    publicDraws[0]?.id ??
-    "";
+  const selectedDrawId = requested && publicDraws.some((d) => d.id === requested) ? requested : "";
 
   const draw = publicDraws.find((d) => d.id === selectedDrawId) ?? null;
+  const bookingPath = draw ? `/book?draw=${encodeURIComponent(draw.id)}` : "/book";
+
+  const chooseDraw = (drawId: string | null) => {
+    const next = new URLSearchParams(params);
+    if (drawId) next.set("draw", drawId);
+    else next.delete("draw");
+    setParams(next);
+    window.scrollTo({ top: 0, behavior: "auto" });
+  };
   const canPurchase = Boolean(draw && draw.status === "open" && settings.allowPaidDraws);
 
   const stats = useAsync(
@@ -279,7 +294,7 @@ export function BookTicketsPage() {
     const state: LowBalanceState = {
       shortfallPaise,
       tickets: selected.size,
-      returnTo: `/book?draw=${encodeURIComponent(draw.id)}`,
+      returnTo: bookingPath,
     };
     navigate("/dashboard/add-money", { state });
   };
@@ -341,9 +356,21 @@ export function BookTicketsPage() {
       <PageHeader
         eyebrow="Book tickets"
         icon={TicketIcon}
-        title="Choose your lucky numbers"
-        description="Availability is read live from the ticket inventory. Only green numbers can be selected; sold, reserved and blocked numbers are locked."
-        crumbs={[{ label: "Home", to: "/" }, { label: "Book tickets" }]}
+        title={draw ? "Choose your lucky numbers" : "Choose your draw"}
+        description={
+          draw
+            ? "Availability is read live from the ticket inventory. Only green numbers can be selected; sold, reserved and blocked numbers are locked."
+            : "Compare the prizes of each draw, then pick one to see its ticket numbers."
+        }
+        crumbs={
+          draw
+            ? [
+                { label: "Home", to: "/" },
+                { label: "Book tickets", to: "/book" },
+                { label: `${formatINRPlain(draw.ticketPricePaise)} draw` },
+              ]
+            : [{ label: "Home", to: "/" }, { label: "Book tickets" }]
+        }
         actions={
           user ? (
             <Link to="/dashboard/wallet">
@@ -352,7 +379,7 @@ export function BookTicketsPage() {
               </Button>
             </Link>
           ) : (
-            <Link to="/login" state={{ from: "/book" }}>
+            <Link to="/login" state={{ from: bookingPath }}>
               <Button variant="outline">Sign in to book</Button>
             </Link>
           )
@@ -369,7 +396,8 @@ export function BookTicketsPage() {
 
         {Number.isInteger(packageQty) && packageQty > 0 ? (
           <Alert tone="info" title={`Package selected: ${packageQty} ticket${packageQty === 1 ? "" : "s"}`} className="mb-4">
-            Pick {packageQty} available number{packageQty === 1 ? "" : "s"} below. The price charged is
+            {draw ? "Pick" : "Choose a draw, then pick"} {packageQty} available number
+            {packageQty === 1 ? "" : "s"}. The price charged is
             always the draw&apos;s ticket price × the numbers you confirm.
           </Alert>
         ) : null}
@@ -388,33 +416,62 @@ export function BookTicketsPage() {
               </Link>
             }
           />
+        ) : !draw ? (
+          <section aria-labelledby="choose-draw-title">
+            <h2
+              id="choose-draw-title"
+              className="mb-3 text-[12px] font-semibold uppercase tracking-[0.1em] text-muted"
+            >
+              Step 1 of 2 · Pick a draw
+            </h2>
+            <div className="grid gap-4 lg:grid-cols-2">
+              {choosableDraws.map((item) => (
+                <DrawPrizeCard
+                  key={item.id}
+                  draw={item}
+                  className="border border-line shadow-[var(--shadow-card)]"
+                >
+                  <Button
+                    className="min-w-[14rem] flex-1"
+                    onClick={() => chooseDraw(item.id)}
+                    iconLeft={<TicketIcon className="size-4" aria-hidden />}
+                    iconRight={<ArrowRight className="size-3.5" aria-hidden />}
+                  >
+                    {item.status === "open"
+                      ? `Choose ${formatINRPlain(item.ticketPricePaise)} tickets`
+                      : "View numbers"}
+                  </Button>
+                  <Link to={`/draws/${item.slug}`} className="flex-1 sm:flex-none">
+                    <Button block variant="outline">Details</Button>
+                  </Link>
+                </DrawPrizeCard>
+              ))}
+            </div>
+          </section>
         ) : (
           <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
             <div className="min-w-0 space-y-4">
               <Card>
                 <CardBody className="space-y-4">
-                  <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-                    <div>
-                      <label
-                        htmlFor="draw-select"
-                        className="mb-1.5 block text-[12px] font-semibold uppercase tracking-[0.1em] text-muted"
-                      >
-                        Festival draw
-                      </label>
-                      <Select
-                        id="draw-select"
-                        value={selectedDrawId}
-                        onChange={(event) => setParams({ draw: event.target.value })}
-                      >
-                        {publicDraws.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.title} ({item.status.replace("_", " ")})
-                          </option>
-                        ))}
-                      </Select>
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/40 bg-gold-soft/40 p-3">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-gold-deep">
+                        Step 2 of 2 · {formatINRPlain(draw.ticketPricePaise)} per ticket
+                      </p>
+                      <p className="mt-0.5 font-display text-[17px] leading-tight text-ink">{draw.title}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      {draw ? <DrawStatusBadge status={draw.status} /> : null}
+                      <DrawStatusBadge status={draw.status} />
+                      {choosableDraws.length > 1 || !choosableDraws.some((d) => d.id === draw.id) ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => chooseDraw(null)}
+                          iconLeft={<ArrowLeftRight className="size-3.5" aria-hidden />}
+                        >
+                          Change draw
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
 
@@ -638,7 +695,7 @@ export function BookTicketsPage() {
                   ) : null}
 
                   {!user ? (
-                    <Link to="/login" state={{ from: "/book" }} className="block">
+                    <Link to="/login" state={{ from: bookingPath }} className="block">
                       <Button block variant="gold">
                         Sign in to continue
                       </Button>
@@ -680,6 +737,23 @@ export function BookTicketsPage() {
                 <Card>
                   <CardBody className="space-y-2 text-[13px]">
                     <p className="font-display text-[15px] text-ink">{draw.title}</p>
+                    {draw.prizes.length ? (
+                      <ul className="divide-y divide-line rounded-xl border border-line bg-ivory/50 px-3">
+                        {draw.prizes.map((prize) => (
+                          <li key={prize.id} className="flex gap-2 py-1.5 leading-snug">
+                            <span className="w-8 shrink-0 font-semibold text-brand">
+                              {prize.quantity > 0 ? prize.title.replace(/\s*prize$/i, "") : "All"}
+                            </span>
+                            <span className="text-ink">
+                              {prize.description}
+                              {prize.quantity > 1 ? (
+                                <span className="text-muted"> · {prize.quantity} winners</span>
+                              ) : null}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                     <p className="text-muted">
                       Maximum {draw.maxTicketsPerUser} numbers per account ·{" "}
                       {settings.maxTicketsPerOrder} per order
