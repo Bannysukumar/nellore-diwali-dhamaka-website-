@@ -8,7 +8,6 @@ import { drawService } from "@/services/drawService";
 import type { Draw, Ticket } from "@/types";
 import {
   Alert,
-  Badge,
   Button,
   Card,
   CardBody,
@@ -21,13 +20,14 @@ import {
 } from "@/components/ui";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DrawStatusBadge } from "@/features/draws/DrawMeta";
+import { FlipTicket } from "@/features/tickets/FlipTicket";
 import { formatINR } from "@/utils/money";
 import { formatDateTime, formatNumber } from "@/utils/format";
 
 type FilterValue = "all" | "open" | "completed";
 
 export function MyTicketsPage() {
-  const { uid } = useAuth();
+  const { uid, profile } = useAuth();
   const [filter, setFilter] = useState<FilterValue>("all");
 
   const tickets = useAsync(
@@ -173,34 +173,20 @@ export function MyTicketsPage() {
                     </Alert>
                   ) : null}
 
-                  <div className="flex flex-wrap gap-2">
+                  <p className="text-[12px] text-muted">
+                    Tap a ticket to flip it and see your Diwali discount coupon.
+                  </p>
+                  <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
                     {group.tickets.map((ticket) => (
-                      <Link
-                        key={ticket.id}
-                        to={`/dashboard/tickets/${ticket.id}`}
-                        className={`group inline-flex flex-col items-center rounded-xl border px-3 py-2 transition ${
-                          ticket.resultStatus === "winner"
-                            ? "border-gold bg-gold-soft/50 hover:border-gold-deep"
-                            : "border-line bg-paper hover:border-emerald"
-                        }`}
-                      >
-                        <span className="font-display text-[15px] font-bold tabular-nums text-ink">
-                          #{ticket.numberLabel}
-                        </span>
-                        <span className="mt-0.5 flex items-center gap-1">
-                          {ticket.resultStatus === "winner" ? (
-                            <Badge tone="gold">Winner</Badge>
-                          ) : ticket.status === "booked" ? (
-                            <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-emerald">
-                              Confirmed
-                            </span>
-                          ) : (
-                            <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-status-pending">
-                              {ticket.status}
-                            </span>
-                          )}
-                        </span>
-                      </Link>
+                      <div key={ticket.id} className="space-y-1.5">
+                        <FlipTicket ticket={ticket} draw={group.draw} holderName={profile?.fullName} />
+                        <Link
+                          to={`/dashboard/tickets/${ticket.id}`}
+                          className="inline-flex text-[12px] font-semibold text-brand hover:underline"
+                        >
+                          Ticket #{ticket.numberLabel} details
+                        </Link>
+                      </div>
                     ))}
                   </div>
 
