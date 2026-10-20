@@ -241,7 +241,9 @@ export function DrawDetailPage() {
                           {TIER_LABEL[prize.tier]}
                         </Badge>
                         <span className="text-[12px] font-semibold text-muted">
-                          {prize.quantity} winner{prize.quantity > 1 ? "s" : ""}
+                          {prize.quantity > 0
+                            ? `${prize.quantity} winner${prize.quantity > 1 ? "s" : ""}`
+                            : "All participants"}
                         </span>
                       </div>
                       <h3 className="mt-1.5 font-display text-[16px]">{prize.title}</h3>

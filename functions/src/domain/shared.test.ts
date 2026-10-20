@@ -166,4 +166,9 @@ describe("prizeAssignmentOrder", () => {
     const prizes = [prize("gold", "g")];
     expect(prizeAssignmentOrder(prizes).map((p) => p.id)).toEqual(["g"]);
   });
+
+  it("never assigns winning tickets to an all-participants perk (quantity 0)", () => {
+    const prizes = [prize("gold", "g"), { ...prize("special", "perk"), quantity: 0 }];
+    expect(prizeAssignmentOrder(prizes).map((p) => p.id)).toEqual(["g"]);
+  });
 });

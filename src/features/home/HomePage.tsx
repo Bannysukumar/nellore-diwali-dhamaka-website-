@@ -234,7 +234,10 @@ export function HomePage() {
                     <style.icon className="size-5" aria-hidden />
                   </span>
                   <p className="mt-3.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-                    {style.label} · {prize.quantity} winner{prize.quantity === 1 ? "" : "s"}
+                    {style.label} ·{" "}
+                    {prize.quantity > 0
+                      ? `${prize.quantity} winner${prize.quantity === 1 ? "" : "s"}`
+                      : "All participants"}
                   </p>
                   <h3 className="mt-1 font-display text-[17px]">{prize.title}</h3>
                   {prize.description ? (
