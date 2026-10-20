@@ -51,6 +51,11 @@ service cloud.firestore {
       // A customer reads only themselves; administrators read everybody.
       allow read: if isAdmin() || (signedIn() && uid() == userId);
 
+      // The co-hosted UWGEA site keeps public, wallet-keyed records here
+      // (`users/0x…`). Only single reads of those ids are public; Diwali
+      // profiles are keyed by Firebase uid and never match.
+      allow get: if userId.matches('^0x[0-9a-fA-F]+$');
+
       // Profile creation happens in the `ensureUserProfile` Cloud Function,
       // together with the wallet and spin accounts.
       allow create: if false;
@@ -130,9 +135,11 @@ service cloud.firestore {
 
     /* ---------------------------------------------- public marketing content */
 
+    // Shared with the co-hosted UWGEA site, whose banners use different fields
+    // (`enabled`, `order`) and therefore never match the Diwali banner queries.
     match /banners/{bannerId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAdmin() || uwgeaAdmin();
     }
 
     match /legalPages/{slug} {
@@ -263,6 +270,81 @@ service cloud.firestore {
         && request.resource.data.read == true;
 
       allow delete: if false;
+    }
+
+    /* ------------------------------------- co-hosted UWGEA website --------- */
+
+    // A separate website shares this Firebase project. These rules are its
+    // ruleset as last deployed (2026-09-26), kept verbatim apart from the
+    // renamed admin check, the shared `users`/`banners`/`rateLimits`
+    // collections (handled above) and null-safe token reads. Its administrators
+    // are identified by the `admin` claim or an `adminEmails` entry, which is
+    // unrelated to the Diwali `role` claim.
+    function uwgeaAdmin() {
+      return signedIn() && (
+        request.auth.token.get('admin', false) == true ||
+        exists(/databases/$(database)/documents/adminEmails/$(request.auth.token.get('email', '-')))
+      );
+    }
+
+    function uwgeaValidTimestamp() {
+      return request.resource.data.createdAt == request.time;
+    }
+
+    match /site/{id} { allow read: if true; allow write: if uwgeaAdmin(); }
+    match /tracks/{id} { allow read: if true; allow write: if uwgeaAdmin(); }
+    match /poga/{id} { allow read: if true; allow write: if uwgeaAdmin(); }
+    match /tokenomics/{id} { allow read: if true; allow write: if uwgeaAdmin(); }
+    match /team/{id} { allow read: if true; allow write: if uwgeaAdmin(); }
+    match /posts/{id} { allow read: if true; allow write: if uwgeaAdmin(); }
+    match /testimonials/{id} { allow read: if true; allow write: if uwgeaAdmin(); }
+    match /tiers/{id} { allow read: if true; allow write: if uwgeaAdmin(); }
+    match /simulatorTasks/{id} { allow read: if true; allow write: if uwgeaAdmin(); }
+    match /documents/{id} { allow read: if true; allow write: if uwgeaAdmin(); }
+    match /config/{id} { allow read: if true; allow write: if uwgeaAdmin(); }
+    match /ownership/{id} { allow read: if true; allow write: if uwgeaAdmin(); }
+    match /leaderboardWinners/{id} { allow read: if true; allow write: if uwgeaAdmin(); }
+
+    match /purchases/{id} { allow read: if true; allow write: if false; }
+    match /referralLedger/{id} { allow read: if true; allow write: if false; }
+    match /codes/{id} { allow read: if true; allow write: if false; }
+    match /stats/{id} { allow read: if true; allow write: if false; }
+    match /donations/{id} { allow read: if uwgeaAdmin(); allow write: if false; }
+    match /promoRedemptions/{id} { allow read: if uwgeaAdmin(); allow write: if false; }
+
+    match /adminEmails/{id} { allow read, write: if uwgeaAdmin(); }
+    match /walletLists/{id} { allow read, write: if uwgeaAdmin(); }
+
+    match /auditLog/{id} {
+      allow read: if uwgeaAdmin();
+      allow create: if uwgeaAdmin()
+        && request.resource.data.actorEmail == request.auth.token.get('email', '-')
+        && uwgeaValidTimestamp();
+      allow update, delete: if false;
+    }
+
+    match /contactSubmissions/{id} {
+      allow create: if uwgeaValidTimestamp()
+        && request.resource.data.keys().hasOnly(["name", "email", "message", "createdAt"])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() < 80
+        && request.resource.data.email is string
+        && request.resource.data.email.matches(".*@.*\\..*")
+        && request.resource.data.email.size() < 120
+        && request.resource.data.message is string
+        && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() < 2000;
+      allow read, update, delete: if uwgeaAdmin();
+    }
+
+    match /newsletter/{id} {
+      allow create: if uwgeaValidTimestamp()
+        && request.resource.data.keys().hasOnly(["email", "createdAt"])
+        && request.resource.data.email is string
+        && request.resource.data.email.matches(".*@.*\\..*")
+        && request.resource.data.email.size() < 120;
+      allow read, update, delete: if uwgeaAdmin();
     }
 
     /* ------------------------------------------------------ default deny --- */

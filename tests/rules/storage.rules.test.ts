@@ -73,6 +73,13 @@ describe("public marketing assets", () => {
     await assertFails(upload("alice", "payment-qr/qr.png"));
   });
 
+  it("keeps the co-hosted UWGEA folders public-read and UWGEA-admin-write", async () => {
+    await assertSucceeds(upload("u2", "site/logo.png", png, image, { admin: true }));
+    await assertSucceeds(storageFor(null).ref("site/logo.png").getMetadata());
+    await assertFails(upload("alice", "site/evil.png"));
+    await assertFails(upload("admin1", "documents/paper.pdf", png, { contentType: "application/pdf" }, { role: "admin" }));
+  });
+
   it("denies everything outside the known folders", async () => {
     await assertFails(upload("admin1", "private/anything.png", png, image, { role: "admin" }));
     await assertFails(storageFor("alice").ref("private/anything.png").getMetadata());

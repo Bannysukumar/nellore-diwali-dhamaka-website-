@@ -6,6 +6,8 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
+import firebase from "firebase/compat/app";
+import "firebase/compat/firestore";
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 
 const PROJECT = "demo-ndd";
@@ -78,6 +80,44 @@ beforeEach(async () => {
     await db.doc("paymentQrCodes/inactive").set({ active: false });
     await db.doc("siteSettings/general").set({ brandName: "X" });
     await db.doc("rateLimits/alice__x").set({ count: 1 });
+    await db.doc("users/0xabc123").set({ wallet: "0xabc123", referralCode: "W1" });
+    await db.doc("tokenomics/main").set({ supply: 1 });
+    await db.doc("adminEmails/ops@uwgea.test").set({ addedAt: now });
+  });
+});
+
+describe("co-hosted UWGEA website", () => {
+  const uwgeaAdmin = () => env.authenticatedContext("u1", { email: "ops@uwgea.test" }).firestore();
+
+  it("keeps its public content readable and admin-writable", async () => {
+    await assertSucceeds(anonymous().doc("tokenomics/main").get());
+    await assertFails(customer().doc("tokenomics/main").set({ supply: 2 }));
+    await assertSucceeds(uwgeaAdmin().doc("tokenomics/main").set({ supply: 2 }));
+    await assertSucceeds(env.authenticatedContext("u2", { admin: true }).firestore().doc("team/x").set({ a: 1 }));
+  });
+
+  it("exposes wallet-keyed records but never Diwali profiles", async () => {
+    await assertSucceeds(anonymous().doc("users/0xabc123").get());
+    await assertFails(anonymous().doc("users/alice").get());
+    await assertFails(anonymous().collection("users").get());
+    await assertFails(anonymous().doc("users/0xabc123").set({ wallet: "0xabc123", role: "admin" }));
+  });
+
+  it("never treats a UWGEA admin as a Diwali admin, or the reverse", async () => {
+    await assertFails(uwgeaAdmin().doc("walletAccounts/alice").get());
+    await assertFails(uwgeaAdmin().doc("users/alice").get());
+    await assertFails(uwgeaAdmin().doc("siteSettings/general").set({ allowPaidDraws: true }));
+    await assertFails(admin().doc("tokenomics/main").set({ supply: 3 }));
+    await assertSucceeds(uwgeaAdmin().doc("banners/promo").set({ title: "Promo", enabled: true, order: 1 }));
+  });
+
+  it("validates public form submissions", async () => {
+    const serverTimestamp = () => firebase.firestore.FieldValue.serverTimestamp();
+    await assertSucceeds(
+      anonymous().collection("newsletter").add({ email: "a@b.co", createdAt: serverTimestamp() }),
+    );
+    await assertFails(anonymous().collection("newsletter").add({ email: "a@b.co", createdAt: serverTimestamp(), x: 1 }));
+    await assertFails(anonymous().collection("newsletter").get());
   });
 });
 

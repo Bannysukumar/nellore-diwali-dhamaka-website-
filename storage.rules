@@ -83,6 +83,32 @@ service firebase.storage {
       allow update, delete: if false;
     }
 
+    /* ------------------------------------- co-hosted UWGEA website --------- */
+
+    // A separate website shares this bucket. Its ruleset as last deployed
+    // (2026-09-26), with null-safe token reads.
+    function uwgeaAdmin() {
+      return signedIn() && (
+        request.auth.token.get('admin', false) == true
+        || firestore.exists(/databases/(default)/documents/adminEmails/$(request.auth.token.get('email', '-')))
+      );
+    }
+
+    match /site/{fileName} {
+      allow read: if true;
+      allow write: if request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*')
+        && uwgeaAdmin();
+    }
+
+    match /documents/{fileName} {
+      allow read: if true;
+      allow write: if request.resource.size < 15 * 1024 * 1024
+        && (request.resource.contentType.matches('image/.*')
+            || request.resource.contentType == 'application/pdf')
+        && uwgeaAdmin();
+    }
+
     /* ------------------------------------------------------- default deny -- */
 
     match /{allPaths=**} {
