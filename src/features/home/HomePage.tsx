@@ -11,6 +11,7 @@ import type { Banner, PrizeTier, WinnerAnnouncement } from "@/types";
 import { describeStoreError } from "@/lib/backend";
 import { Alert, Badge, Button, Card, CardBody, CardHeader, ErrorState, SectionHeading, SkeletonGrid } from "@/components/ui";
 import { Hero } from "@/features/home/Hero";
+import { PrizeHighlights } from "@/features/home/PrizeHighlights";
 import { HowItWorks } from "@/features/home/HowItWorks";
 import { PackageSection } from "@/features/home/PackageSection";
 import { ReferralBanner } from "@/features/home/ReferralBanner";
@@ -57,6 +58,8 @@ export function HomePage() {
 
   return (
     <>
+      <PrizeHighlights />
+
       <Hero
         brandName={settings.brandName}
         draw={draw}
