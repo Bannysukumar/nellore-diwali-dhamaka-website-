@@ -66,7 +66,10 @@ Do these in the Firebase / Google Cloud console for the target project.
    default in `functions/src/bootstrap.ts`. Callables are also deployed to
    `asia-south1` for web builds released before the move; once every server has
    been rebuilt, drop it from `CALLABLE_REGIONS` and deploy with `--force` so
-   the CLI deletes the Mumbai copies.
+   the CLI deletes the Mumbai copies. During busy sales periods set
+   `WARM_INSTANCES=1` in `functions/.env.<project-id>` and redeploy so the
+   customer callables never cold-start; set it back to `0` afterwards, because
+   warm instances are billed while idle.
 4. **Storage**: create the default bucket, then apply the CORS policy so the
    admin console can stream private payment screenshots with the signed-in
    admin's credentials:

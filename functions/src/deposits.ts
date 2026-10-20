@@ -3,6 +3,7 @@ import { getStorage } from "firebase-admin/storage";
 import {
   CALLABLE_OPTIONS,
   COLLECTIONS,
+  HOT_CALLABLE_OPTIONS,
   adjustPending,
   applyLedger,
   audit,
@@ -46,7 +47,7 @@ export interface PickPaymentQrResponse {
  * so the choice is random across sessions but stable within one: the QR never
  * changes while the customer is mid-payment. Only active codes are handed out.
  */
-export const pickPaymentQr = onCall<unknown>(CALLABLE_OPTIONS, async (request): Promise<PickPaymentQrResponse> => {
+export const pickPaymentQr = onCall<unknown>(HOT_CALLABLE_OPTIONS, async (request): Promise<PickPaymentQrResponse> => {
   await requireUser(request.auth);
   const data = requireObject<Record<string, unknown>>(request.data);
   const sessionKey = requireString(data, "sessionKey", 120);
@@ -96,7 +97,7 @@ export function isOwnScreenshotPath(path: string, uid: string): boolean {
  * a finance operator has confirmed the money actually arrived. A UTR that has
  * already been used is never auto-credited — it is routed to manual review.
  */
-export const submitDeposit = onCall<unknown>(CALLABLE_OPTIONS, async (request): Promise<SubmitDepositResponse> => {
+export const submitDeposit = onCall<unknown>(HOT_CALLABLE_OPTIONS, async (request): Promise<SubmitDepositResponse> => {
   const user = await requireUser(request.auth);
   const config = await readSettings();
   const data = requireObject<Record<string, unknown>>(request.data);

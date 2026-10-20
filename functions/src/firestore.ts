@@ -41,6 +41,18 @@ export const CALLABLE_OPTIONS: CallableOptions = {
 };
 
 /**
+ * Options for the customer callables a person waits on after a tap (sign-in,
+ * buying tickets, spinning, adding and sending money). `WARM_INSTANCES` in
+ * `functions/.env.<project-id>` keeps that many instances running in every
+ * region so the first call after a quiet spell skips the cold start. Warm
+ * instances are billed while idle: keep it at 0 outside busy sales periods.
+ */
+export const HOT_CALLABLE_OPTIONS: CallableOptions = {
+  ...CALLABLE_OPTIONS,
+  minInstances: Math.max(0, Number.parseInt(process.env.WARM_INSTANCES ?? "0", 10) || 0),
+};
+
+/**
  * Thin, typed access layer over Firestore.
  *
  * Every privileged read/write in this codebase goes through here so the
