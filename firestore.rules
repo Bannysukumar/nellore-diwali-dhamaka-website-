@@ -1,0 +1,274 @@
+rules_version = '2';
+
+/**
+ * Security rules for Nellore Diwali Dhamaka.
+ *
+ * Design principles:
+ *   1. The client is never the authority for money, tickets, spins or winners.
+ *      Wallets, the ledger, orders, deposits, spin accounts, referrals, draw
+ *      results and winner announcements are written ONLY by Cloud Functions
+ *      (Admin SDK, which bypasses these rules). Client writes to those
+ *      collections are denied for everybody — including administrators.
+ *   2. Administrator identity comes from a server-set custom claim (`role`).
+ *      Writing `role: "admin"` into a document does nothing, and rules here
+ *      reject any attempt to change `role` or `status` from the client.
+ *   3. Public content (published draws, banners, settings, legal pages,
+ *      rewards) is readable so the marketing site and ticket grid work signed-out, but
+ *      writable only by administrators — and even then, state transitions that
+ *      carry money or outcomes (cancelling with refunds, results, sales) are
+ *      reserved for Cloud Functions.
+ *   4. Personal data is scoped to its owner.
+ *   5. Every administrator write that is allowed here is captured server-side
+ *      by the audit triggers in `functions/src/triggers.ts`.
+ */
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* ------------------------------------------------------------- helpers */
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    // Administrator rights come exclusively from the custom claim, which only
+    // the backend can set (see `setAdminClaim`).
+    function isAdmin() {
+      return signedIn() && request.auth.token.get('role', '') == 'admin';
+    }
+
+    function changed() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    /* --------------------------------------------------------------- users */
+
+    match /users/{userId} {
+      // A customer reads only themselves; administrators read everybody.
+      allow read: if isAdmin() || (signedIn() && uid() == userId);
+
+      // Profile creation happens in the `ensureUserProfile` Cloud Function,
+      // together with the wallet and spin accounts.
+      allow create: if false;
+
+      // Limited self-service edits. Notably absent: role, status, phone,
+      // phoneMasked, referralCode, referredByUid, referralEligible.
+      allow update: if signedIn()
+        && uid() == userId
+        && changed().hasOnly(['fullName', 'email', 'address', 'updatedAt', 'lastLoginAt'])
+        && (!('fullName' in request.resource.data)
+            || (request.resource.data.fullName is string
+                && request.resource.data.fullName.size() >= 2
+                && request.resource.data.fullName.size() <= 80));
+
+      // Administrators may suspend/reactivate, but never change the role here:
+      // promotion is a custom-claim operation performed by the backend.
+      allow update: if isAdmin()
+        && changed().hasOnly(['status', 'suspendedReason', 'updatedAt'])
+        && request.resource.data.status in ['active', 'suspended'];
+
+      allow delete: if false;
+    }
+
+    /* --------------------------------------------------------------- draws */
+
+    // Statuses an administrator may set directly. `results_pending` and
+    // `completed` are set by runDraw/publishDrawResults, and `cancelled` by
+    // cancelDraw (which also refunds ticket holders).
+    function clientDrawStatus(status) {
+      return status in ['draft', 'upcoming', 'open', 'sales_closed', 'in_progress'];
+    }
+
+    // Fields that define ticket inventory; frozen once tickets exist.
+    function inventoryFields() {
+      return ['ticketNumberStart', 'ticketNumberEnd', 'numberPadding', 'totalTickets', 'ticketPricePaise'];
+    }
+
+    function inventoryExists(drawId) {
+      return exists(/databases/$(database)/documents/tickets/$('tkt_' + drawId + '_' + string(resource.data.ticketNumberStart)));
+    }
+
+    function validDraw(d) {
+      return d.title is string && d.title.size() >= 4 && d.title.size() <= 140
+        && d.ticketPricePaise is int && d.ticketPricePaise > 0
+        && d.ticketNumberStart is int && d.ticketNumberEnd is int
+        && d.ticketNumberEnd > d.ticketNumberStart
+        && d.ticketNumberEnd - d.ticketNumberStart < 20000
+        && d.maxTicketsPerUser is int && d.maxTicketsPerUser >= 1
+        && d.published is bool
+        && d.salesCloseAt is string && d.drawAt is string
+        && d.salesCloseAt <= d.drawAt;
+    }
+
+    match /draws/{drawId} {
+      // Drafts and unpublished schedules stay private to administrators.
+      // Public queries must therefore filter on `published == true`.
+      allow read: if isAdmin() || resource.data.published == true;
+
+      allow create: if isAdmin()
+        && validDraw(request.resource.data)
+        && request.resource.data.status in ['draft', 'upcoming'];
+
+      allow update: if isAdmin()
+        && validDraw(request.resource.data)
+        // Once winners are drawn, or the draw is cancelled, only copy may change.
+        && (resource.data.status in ['results_pending', 'completed', 'cancelled']
+              ? changed().hasOnly(['description', 'eligibility', 'bannerUrl', 'updatedAt'])
+              : (!('status' in changed()) || clientDrawStatus(request.resource.data.status)))
+        && (!changed().hasAny(inventoryFields()) || !inventoryExists(drawId))
+        && !changed().hasAny(['cancelledAt', 'cancelReason']);
+
+      // Only an empty draft can be removed; anything else is cancelled instead.
+      allow delete: if isAdmin()
+        && resource.data.status == 'draft'
+        && !inventoryExists(drawId);
+    }
+
+    /* ---------------------------------------------- public marketing content */
+
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /legalPages/{slug} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Site settings hold pricing/branding config AND the spin config. Only
+    // administrators may change them; everyone can read.
+    match /siteSettings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Active payment QRs are shown during checkout. Inactive ones are not
+    // exposed to customers, but administrators can manage all of them.
+    match /paymentQrCodes/{qrId} {
+      allow read: if isAdmin() || resource.data.active == true;
+      allow write: if isAdmin();
+    }
+
+    // The reward catalogue is public (it is marketing copy for the wheel).
+    match /rewards/{rewardId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    /* -------------------------------------------------------------- tickets */
+
+    // The ticket grid is intentionally public so availability can be browsed
+    // before signing in. Tickets are SOLD only by `purchaseTickets`.
+    match /tickets/{ticketId} {
+      allow read: if true;
+
+      // No client creates tickets. `generateTicketInventory` owns that.
+      allow create: if false;
+
+      // Administrators may only block/unblock unsold inventory from the
+      // console; a ticket can never be reassigned, priced or marked sold here.
+      allow update: if isAdmin()
+        && resource.data.status in ['available', 'blocked']
+        && changed().hasOnly(['status', 'blockedReason', 'updatedAt'])
+        && request.resource.data.status in ['available', 'blocked'];
+
+      allow delete: if false;
+    }
+
+    /* ----------------------------------------------------- money & outcomes */
+
+    // Server-only by design. Reads are owner/admin scoped; writes never happen
+    // from a client, because a forged balance would be indistinguishable from a
+    // real one once it is in the database.
+    match /walletAccounts/{userId} {
+      allow read: if isAdmin() || (signedIn() && uid() == userId);
+      allow write: if false;
+    }
+
+    match /walletTransactions/{txId} {
+      allow read: if isAdmin() || (signedIn() && uid() == resource.data.uid);
+      allow write: if false;
+    }
+
+    match /orders/{orderId} {
+      allow read: if isAdmin() || (signedIn() && uid() == resource.data.uid);
+      allow write: if false;
+    }
+
+    match /depositRequests/{depositId} {
+      allow read: if isAdmin() || (signedIn() && uid() == resource.data.uid);
+      allow write: if false;
+    }
+
+    match /spinAccounts/{userId} {
+      allow read: if isAdmin() || (signedIn() && uid() == userId);
+      allow write: if false;
+    }
+
+    match /spinTransactions/{spinId} {
+      allow read: if isAdmin() || (signedIn() && uid() == resource.data.uid);
+      allow write: if false;
+    }
+
+    match /referrals/{referralId} {
+      // Either side of the relationship may see it.
+      allow read: if isAdmin()
+        || (signedIn() && (uid() == resource.data.referrerUid || uid() == resource.data.refereeUid));
+      // claimReferral / qualifyReferral / moderateReferral only.
+      allow write: if false;
+    }
+
+    match /drawResults/{drawId} {
+      // Unpublished results are visible to administrators only.
+      allow read: if isAdmin() || resource.data.published == true;
+      allow write: if false; // only `runDraw` / `publishDrawResults`
+    }
+
+    match /winnerAnnouncements/{winnerId} {
+      // Hidden announcements stay private; the winner always sees their own.
+      allow read: if isAdmin()
+        || resource.data.status == 'published'
+        || (signedIn() && uid() == resource.data.winnerUid);
+      allow write: if false; // `publishDrawResults` / `moderateWinner`
+    }
+
+    match /adminAuditLogs/{logId} {
+      allow read: if isAdmin();
+      // An audit log the subject can rewrite is not an audit log.
+      allow write: if false;
+    }
+
+    match /rateLimits/{key} {
+      allow read, write: if false;
+    }
+
+    /* -------------------------------------------------------- notifications */
+
+    match /notifications/{notificationId} {
+      allow read: if isAdmin() || (signedIn() && uid() == resource.data.uid);
+
+      // Written only by Cloud Functions (transactional notices and the
+      // admin-only, audit-logged `broadcastAnnouncement` callable).
+      allow create: if false;
+
+      // A holder may mark their own notification as read, and nothing else.
+      allow update: if signedIn()
+        && uid() == resource.data.uid
+        && changed().hasOnly(['read'])
+        && request.resource.data.read == true;
+
+      allow delete: if false;
+    }
+
+    /* ------------------------------------------------------ default deny --- */
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

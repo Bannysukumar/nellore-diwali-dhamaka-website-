@@ -1,0 +1,26 @@
+{
+  "name": "nellore-diwali-dhamaka-functions",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Privileged server-side operations for Nellore Diwali Dhamaka. All money-sensitive writes happen here and nowhere else.",
+  "main": "lib/index.js",
+  "engines": {
+    "node": "20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "serve": "npm run build && firebase emulators:start --project demo-ndd --only functions,firestore,auth,storage",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0",
+    "firebase-functions": "^6.3.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "vitest": "^3.1.0"
+  }
+}

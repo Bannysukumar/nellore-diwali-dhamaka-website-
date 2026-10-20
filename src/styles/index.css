@@ -1,0 +1,337 @@
+@import "tailwindcss";
+
+/* =========================================================================
+   Nellore Diwali Dhamaka — design tokens
+   A single source of truth for colour, type, spacing, elevation and motion.
+   ========================================================================= */
+
+@theme {
+  /* --- Brand palette ---------------------------------------------------- */
+  --color-brand: #9f2028; /* deep festival red */
+  --color-brand-strong: #7d171e;
+  --color-brand-soft: #c8454c;
+  --color-saffron: #f28c28;
+  --color-saffron-soft: #fbe3c8;
+  --color-gold: #d4af37;
+  --color-gold-soft: #f3e3ad;
+  --color-gold-deep: #a8842a;
+  --color-maroon: #651b24;
+  --color-maroon-deep: #4a121a;
+  --color-emerald: #177245;
+  --color-emerald-soft: #e2f2e9;
+
+  /* --- Neutrals --------------------------------------------------------- */
+  --color-ivory: #fff9ed;
+  --color-paper: #ffffff;
+  --color-ink: #202522;
+  --color-muted: #6b706d;
+  --color-line: #e8e0d0;
+  --color-line-strong: #d9cfb8;
+
+  /* --- Ticket / status colours ----------------------------------------- */
+  --color-status-available: #177245;
+  --color-status-available-bg: #e2f2e9;
+  --color-status-pending: #a06a00;
+  --color-status-pending-bg: #fdf1d3;
+  --color-status-booked: #b3261e;
+  --color-status-booked-bg: #fbe3e1;
+  --color-status-blocked: #c2620f;
+  --color-status-blocked-bg: #fdeada;
+
+  /* --- Typography ------------------------------------------------------- */
+  --font-display: "Playfair Display", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+
+  /* --- Radii ------------------------------------------------------------ */
+  --radius-card: 14px;
+  --radius-panel: 20px;
+  --radius-pill: 999px;
+
+  /* --- Elevation -------------------------------------------------------- */
+  --shadow-card: 0 1px 2px rgb(32 37 34 / 0.04), 0 10px 26px -18px rgb(101 27 36 / 0.35);
+  --shadow-raised: 0 2px 6px rgb(32 37 34 / 0.06), 0 22px 46px -26px rgb(101 27 36 / 0.45);
+  --shadow-gold: 0 10px 30px -14px rgb(212 175 55 / 0.75);
+
+  /* --- Motion ----------------------------------------------------------- */
+  --ease-festival: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 140ms;
+  --dur-base: 240ms;
+  --dur-slow: 460ms;
+
+  /* --- Layout ----------------------------------------------------------- */
+  --page-width: 1200px;
+  --page-width-wide: 1360px;
+}
+
+/* =========================================================================
+   Base
+   Unlayered CSS outranks every Tailwind layer, so element defaults must live
+   in `@layer base` or they would override utilities such as `text-white`.
+   ========================================================================= */
+
+@layer base {
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background-color: var(--color-ivory);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  color: inherit;
+  font-weight: 700;
+  line-height: 1.14;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: var(--color-gold-soft);
+  color: var(--color-maroon);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-saffron);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Thin, unobtrusive scrollbars for scrollable panels */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+}
+
+/* =========================================================================
+   Layout helpers
+   ========================================================================= */
+
+@layer components {
+.page {
+  width: 100%;
+  max-width: var(--page-width);
+  margin-inline: auto;
+  padding-inline: 16px;
+}
+
+.page-wide {
+  width: 100%;
+  max-width: var(--page-width-wide);
+  margin-inline: auto;
+  padding-inline: 16px;
+}
+
+@media (min-width: 640px) {
+  .page,
+  .page-wide {
+    padding-inline: 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .page,
+  .page-wide {
+    padding-inline: 32px;
+  }
+}
+
+/* Safe-area padding for notched phones / bottom navigation */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* =========================================================================
+   Festival decoration (kept behind content, never harms readability)
+   ========================================================================= */
+
+.pattern-rangoli {
+  background-image: radial-gradient(
+      circle at 50% 50%,
+      rgb(212 175 55 / 0.16) 0 2px,
+      transparent 2px
+    ),
+    radial-gradient(circle at 0% 0%, rgb(242 140 40 / 0.12) 0 2px, transparent 2px);
+  background-size: 34px 34px, 52px 52px;
+  background-position: 0 0, 17px 17px;
+}
+
+.pattern-dots {
+  background-image: radial-gradient(rgb(212 175 55 / 0.5) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+/* Selective gradients — hero, reward cards, premium buttons only. */
+.gradient-hero {
+  background:
+    radial-gradient(120% 90% at 15% 10%, rgb(242 140 40 / 0.35) 0%, transparent 55%),
+    radial-gradient(100% 80% at 85% 20%, rgb(212 175 55 / 0.3) 0%, transparent 60%),
+    linear-gradient(155deg, #651b24 0%, #9f2028 52%, #4a121a 100%);
+}
+
+.gradient-gold {
+  background: linear-gradient(135deg, #f3e3ad 0%, #d4af37 45%, #a8842a 100%);
+}
+
+.gradient-reward {
+  background:
+    radial-gradient(90% 120% at 100% 0%, rgb(242 140 40 / 0.45) 0%, transparent 60%),
+    linear-gradient(140deg, #651b24 0%, #9f2028 100%);
+}
+
+.text-gold-gradient {
+  background: linear-gradient(120deg, #f7ecc4 0%, #d4af37 40%, #fff3cf 70%, #d4af37 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.gold-rule {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-gold) 20%,
+    var(--color-gold) 80%,
+    transparent 100%
+  );
+}
+
+/* Ticket-shaped card with punched notches */
+.ticket-edge {
+  position: relative;
+  background:
+    radial-gradient(circle at 0 50%, transparent 0 9px, var(--color-paper) 9.5px) left / 51% 100% no-repeat,
+    radial-gradient(circle at 100% 50%, transparent 0 9px, var(--color-paper) 9.5px) right / 51% 100%
+      no-repeat;
+}
+
+.ticket-edge::after {
+  content: "";
+  position: absolute;
+  inset-block: 12px;
+  left: 50%;
+  border-left: 1.5px dashed var(--color-line-strong);
+}
+
+/* Gold ornamental frame used on hero art / winner cards */
+.ornament-frame {
+  box-shadow:
+    inset 0 0 0 1px rgb(212 175 55 / 0.55),
+    inset 0 0 0 5px rgb(255 255 255 / 0.06),
+    var(--shadow-raised);
+}
+
+/* Shimmering skeleton loading state */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: #efe8da;
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.75), transparent);
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+.animate-float-slow {
+  animation: float-slow 7s var(--ease-festival) infinite;
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(212 175 55 / 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgb(212 175 55 / 0);
+  }
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 2.4s ease-out infinite;
+}
+}
+
+/* =========================================================================
+   Accessibility
+   ========================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border-width: 0;
+}

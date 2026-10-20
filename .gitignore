@@ -1,0 +1,28 @@
+node_modules
+dist
+dist-ssr
+coverage
+*.local
+.env
+.env.*
+!.env.example
+!.env.development.example
+!.env.staging.example
+!.env.production.example
+.firebase
+functions/lib
+.emulator-data
+functions/.env
+functions/.env.*
+!functions/.env.example
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+# Service account keys must never be committed. `*-firebase-adminsdk-*.json`
+# is the pattern the Firebase console uses when you download one, so it is
+# matched explicitly as well as the generic `service-account*.json`.
+service-account*.json
+*-firebase-adminsdk-*.json
+*firebase-adminsdk*.json
+*.log
+.DS_Store

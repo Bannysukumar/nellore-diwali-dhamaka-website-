@@ -1,0 +1,12 @@
+[
+  {
+    "origin": [
+      "https://uwgea32.web.app",
+      "https://uwgea32.firebaseapp.com",
+      "http://localhost:5173"
+    ],
+    "method": ["GET"],
+    "responseHeader": ["Content-Type", "Authorization", "x-goog-meta-*"],
+    "maxAgeSeconds": 3600
+  }
+]

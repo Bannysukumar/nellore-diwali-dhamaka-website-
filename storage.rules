@@ -1,0 +1,92 @@
+rules_version = '2';
+
+/**
+ * Cloud Storage rules for Nellore Diwali Dhamaka.
+ *
+ * Two distinct areas:
+ *   - Public marketing assets (banners, splash art, payment QR images) that the
+ *     site renders for signed-out visitors. Anyone may read; only an
+ *     administrator may write.
+ *   - Deposit screenshots, which are financial evidence. A customer may upload
+ *     only into their own folder and may read only their own files. Nobody
+ *     else — not even another signed-in customer — can list or fetch them.
+ *     Once uploaded they are immutable: neither the customer nor an
+ *     administrator can overwrite or delete them, so the evidence behind a
+ *     wallet credit cannot be swapped after review.
+ *
+ * Uploads are size- and type-limited here as well as in the client, because the
+ * client check is a courtesy and this one is the actual control.
+ */
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.get('role', '') == 'admin';
+    }
+
+    // 5 MB is generous for a UPI confirmation screenshot and small enough to
+    // make accidental (or deliberate) large uploads fail fast.
+    function underFiveMb() {
+      return request.resource.size < 5 * 1024 * 1024;
+    }
+
+    function isImage() {
+      return request.resource.contentType.matches('image/(png|jpeg|webp|heic)');
+    }
+
+    function uploadLooksValid() {
+      return underFiveMb() && isImage();
+    }
+
+    /* -------------------------------------------------- marketing assets -- */
+
+    match /banners/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if isAdmin() && uploadLooksValid();
+      allow delete: if isAdmin();
+    }
+
+    match /splash/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if isAdmin() && uploadLooksValid();
+      allow delete: if isAdmin();
+    }
+
+    match /payment-qr/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if isAdmin() && uploadLooksValid();
+      allow delete: if isAdmin();
+    }
+
+    /* ------------------------------------------- deposit screenshots ------ */
+
+    // Path convention: deposit-screenshots/{uid}/{fileName}
+    match /deposit-screenshots/{userId}/{fileName} {
+      // Only the owner and administrators can retrieve a screenshot. Listing a
+      // folder is limited the same way.
+      allow get, list: if isAdmin() || (signedIn() && request.auth.uid == userId);
+
+      // New uploads only, by the account owner, into their own folder.
+      // `resource == null` is required: an upload to an existing path can be
+      // evaluated as a create, which would let evidence be overwritten.
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && resource == null
+        && uploadLooksValid();
+
+      // Evidence is immutable.
+      allow update, delete: if false;
+    }
+
+    /* ------------------------------------------------------- default deny -- */
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
