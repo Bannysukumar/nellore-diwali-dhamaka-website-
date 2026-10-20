@@ -17,6 +17,7 @@ import { useAuth } from "@/app/AuthProvider";
 import { UNCONFIGURED_SETTINGS, useSettings } from "@/app/SettingsProvider";
 import { contentService } from "@/services/contentService";
 import { adminService } from "@/services/adminService";
+import { DEFAULT_SHARE_MESSAGE, renderShareMessage, rewardService } from "@/services/rewardService";
 import { describeStoreError, store } from "@/lib/backend";
 import type { SiteSettings, TicketPackage } from "@/types";
 import {
@@ -56,6 +57,7 @@ interface SettingsDraft {
   refundWindowHours: string;
   minAge: string;
   legalDisclaimer: string;
+  referralShareMessage: string;
 }
 
 function toDraft(settings: SiteSettings): SettingsDraft {
@@ -72,6 +74,7 @@ function toDraft(settings: SiteSettings): SettingsDraft {
     refundWindowHours: String(settings.refundWindowHours),
     minAge: String(settings.minAge),
     legalDisclaimer: settings.legalDisclaimer,
+    referralShareMessage: settings.referralShareMessage ?? DEFAULT_SHARE_MESSAGE,
   };
 }
 
@@ -149,6 +152,7 @@ export function AdminSettingsPage() {
         refundWindowHours,
         minAge,
         legalDisclaimer: current.legalDisclaimer.trim(),
+        referralShareMessage: current.referralShareMessage.trim() || DEFAULT_SHARE_MESSAGE,
         updatedAt: new Date().toISOString(),
       };
 
@@ -344,6 +348,30 @@ export function AdminSettingsPage() {
                   value={current.supportEmail}
                   onChange={(event) => update({ supportEmail: event.target.value })}
                 />
+              </div>
+            </FormRow>
+            <FormRow columns={2}>
+              <div>
+                <Label htmlFor="set-share" hint="{code}, {link} and {brand} are filled in">
+                  WhatsApp referral message
+                </Label>
+                <Textarea
+                  id="set-share"
+                  rows={6}
+                  maxLength={1000}
+                  value={current.referralShareMessage}
+                  onChange={(event) => update({ referralShareMessage: event.target.value })}
+                />
+              </div>
+              <div>
+                <p className="mb-1.5 text-[13px] font-semibold text-ink">Preview</p>
+                <p className="whitespace-pre-wrap rounded-xl border border-line bg-ivory/60 p-3 text-[13px] leading-relaxed text-ink">
+                  {renderShareMessage(current.referralShareMessage, {
+                    code: "NDD1234",
+                    link: rewardService.referralLink("NDD1234"),
+                    brand: current.brandName.trim() || "Nellore Diwali Dhamaka",
+                  })}
+                </p>
               </div>
             </FormRow>
             <div className="flex justify-end">

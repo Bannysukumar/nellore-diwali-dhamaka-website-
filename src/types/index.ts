@@ -428,6 +428,8 @@ export interface SiteSettings {
   refundWindowHours: number;
   minAge: number;
   legalDisclaimer: string;
+  /** "Share on WhatsApp" referral text. Supports {code}, {link} and {brand}. */
+  referralShareMessage?: string;
   updatedAt: ISODate;
 }
 

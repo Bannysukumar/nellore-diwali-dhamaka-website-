@@ -230,7 +230,7 @@ export function ReferralsPage() {
                   {copied ? "Copied" : "Copy code"}
                 </Button>
                 <a
-                  href={code ? rewardService.whatsappShareUrl(code, settings.brandName) : "#"}
+                  href={code ? rewardService.whatsappShareUrl(code, settings.brandName, settings.referralShareMessage) : "#"}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-disabled={!code}

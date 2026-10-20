@@ -2,6 +2,26 @@ import type { Referral, Reward, SpinAccount, SpinConfig, SpinTransaction, WheelS
 import { store } from "@/lib/backend";
 import { APP_ORIGIN } from "@/lib/firebase/config";
 
+export const DEFAULT_SHARE_MESSAGE = "🪔 {brand}: join with my referral code {code} and get festival rewards. {link}";
+
+/**
+ * Fills a referral share template. The code and link are appended when the
+ * template omits them, so an edited message can never break attribution.
+ */
+export function renderShareMessage(
+  template: string | undefined,
+  values: { code: string; link: string; brand: string },
+): string {
+  const source = template?.trim() || DEFAULT_SHARE_MESSAGE;
+  let message = source
+    .replaceAll("{brand}", values.brand)
+    .replaceAll("{code}", values.code)
+    .replaceAll("{link}", values.link);
+  if (!source.includes("{code}")) message += `\nReferral code: ${values.code}`;
+  if (!source.includes("{link}")) message += `\n${values.link}`;
+  return message;
+}
+
 export const rewardService = {
   async spinConfig(): Promise<SpinConfig | null> {
     const row = await store.get<SpinConfig & { id: string }>("siteSettings", "spin");
@@ -82,9 +102,8 @@ export const rewardService = {
     return `${APP_ORIGIN}/register?ref=${encodeURIComponent(code)}`;
   },
 
-  whatsappShareUrl(code: string, brandName: string): string {
-    const link = this.referralLink(code);
-    const message = `🪔 ${brandName}: join with my referral code ${code} and get festival rewards. ${link}`;
+  whatsappShareUrl(code: string, brandName: string, template?: string): string {
+    const message = renderShareMessage(template, { code, link: this.referralLink(code), brand: brandName });
     return `https://wa.me/?text=${encodeURIComponent(message)}`;
   },
 
