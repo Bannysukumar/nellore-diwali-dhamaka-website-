@@ -9,6 +9,7 @@ import {
   registerCustomer,
   requestId,
   resetEmulators,
+  signInWithCustomToken,
   signInWithPhone,
   writeSettings,
   type TestUser,
@@ -115,5 +116,32 @@ describe("authentication, profiles and administrator authority", () => {
     expect(
       await callError("broadcastAnnouncement", { ...payload, href: "https://evil.example" }, admin.token),
     ).toBe("INVALID_ARGUMENT");
+  });
+
+  it("lets an admin open a read-only, audited view of a customer's account", async () => {
+    const user = await registerCustomer("Viewed Customer");
+    const { token } = await call<{ token: string }>("startViewAs", { uid: user.uid }, admin.token);
+    const viewToken = await signInWithCustomToken(token);
+
+    expect(await callError("ensureUserProfile", {}, viewToken)).toBe("PERMISSION_DENIED");
+    expect(
+      await callError("purchaseTickets", { drawId: "x", ticketIds: ["y"], requestId: requestId("vw") }, viewToken),
+    ).toBe("PERMISSION_DENIED");
+    expect(await callError("executeSpin", { requestId: requestId("vw") }, viewToken)).toBe("PERMISSION_DENIED");
+
+    const audit = await db
+      .collection("adminAuditLogs")
+      .where("action", "==", "customer.view_as")
+      .where("entityId", "==", user.uid)
+      .get();
+    expect(audit.size).toBe(1);
+  });
+
+  it("refuses view-as for customers and for administrator accounts", async () => {
+    const user = await registerCustomer("Curious Customer");
+    const other = await registerCustomer("Other Customer");
+    expect(await callError("startViewAs", { uid: other.uid }, user.token)).toBe("PERMISSION_DENIED");
+    const secondAdmin = await registerAdmin();
+    expect(await callError("startViewAs", { uid: secondAdmin.uid }, admin.token)).toBe("FAILED_PRECONDITION");
   });
 });

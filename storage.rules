@@ -76,6 +76,7 @@ service firebase.storage {
       // evaluated as a create, which would let evidence be overwritten.
       allow create: if signedIn()
         && request.auth.uid == userId
+        && request.auth.token.get('impersonatedBy', null) == null
         && resource == null
         && uploadLooksValid();
 

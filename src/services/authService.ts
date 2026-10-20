@@ -21,6 +21,8 @@ export interface AuthUser {
    * rules and functions trust. UI only; it never grants access by itself.
    */
   isAdmin: boolean;
+  /** Set when an administrator opened this read-only session with `startViewAs`. */
+  impersonatedBy?: string;
 }
 
 /** Seconds a customer must wait before requesting another OTP. */
@@ -123,17 +125,19 @@ export function onAuthChange(cb: AuthListener): () => void {
       }
       const token = await user.getIdTokenResult();
       const isAdmin = token.claims.role === "admin";
+      const impersonatedBy =
+        typeof token.claims.impersonatedBy === "string" ? token.claims.impersonatedBy : undefined;
       const phone = user.phoneNumber ?? "";
       unsubscribeProfile = onSnapshot(
         doc(firestore(), "users", user.uid),
         (snap) => {
           if (cancelled) return;
           const profile = snap.exists() ? ({ ...(snap.data() as UserProfile), uid: snap.id }) : null;
-          cb({ uid: user.uid, phone, profile, profileError: false, isAdmin });
+          cb({ uid: user.uid, phone, profile, profileError: false, isAdmin, impersonatedBy });
         },
         (error) => {
           console.error("[auth] profile subscription failed", error);
-          cb({ uid: user.uid, phone, profile: null, profileError: true, isAdmin });
+          cb({ uid: user.uid, phone, profile: null, profileError: true, isAdmin, impersonatedBy });
         },
       );
     });
@@ -248,4 +252,27 @@ export async function signOutUser(): Promise<void> {
   resetRecaptcha();
   const { mod, auth } = await loadAuth();
   await mod.signOut(auth);
+}
+
+/**
+ * Signs this tab into a read-only customer session minted by `startViewAs`.
+ * Only valid in a view-as tab, whose auth state lives in sessionStorage.
+ */
+export async function signInForViewAs(token: string): Promise<void> {
+  const { VIEW_AS_FLAG, isViewAsTab } = await import("@/lib/firebase/client");
+  if (!isViewAsTab()) throw new Error("View-as sessions must be opened from the admin customers page.");
+  window.sessionStorage.setItem(VIEW_AS_FLAG, "1");
+  const { mod, auth } = await loadAuth();
+  try {
+    await mod.signInWithCustomToken(auth, token);
+  } catch (error) {
+    throw new Error(describeAuthError(error));
+  }
+}
+
+/** Ends a view-as session; the administrator's own session in other tabs is untouched. */
+export async function endViewAs(): Promise<void> {
+  const { VIEW_AS_FLAG } = await import("@/lib/firebase/client");
+  await signOutUser();
+  window.sessionStorage.removeItem(VIEW_AS_FLAG);
 }

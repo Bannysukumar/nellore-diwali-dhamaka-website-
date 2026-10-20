@@ -9,6 +9,7 @@ import {
   enforceRateLimit,
   notify,
   readDoc,
+  rejectViewAs,
   requireUser,
 } from "./firestore.js";
 import { invalidArgument, requireObject, unauthenticated } from "./errors.js";
@@ -65,6 +66,7 @@ export const ensureUserProfile = onCall<unknown>(
   async (request): Promise<EnsureProfileResponse> => {
     const auth = request.auth;
     if (!auth?.uid) unauthenticated("Please sign in to continue.");
+    rejectViewAs(auth);
     const uid = auth.uid;
     const phone = auth.token.phone_number ?? "";
     if (!phone) invalidArgument("A verified mobile number is required.");

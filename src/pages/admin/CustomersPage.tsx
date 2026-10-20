@@ -3,6 +3,7 @@ import {
   Ban,
   CheckCircle2,
   Coins,
+  Eye,
   Search,
   ShoppingBag,
   Sparkles,
@@ -21,7 +22,12 @@ import { rewardService } from "@/services/rewardService";
 import { adminService } from "@/services/adminService";
 import { useDebounced } from "@/hooks/useCollection";
 import { callBackend } from "@/lib/backend/callBackend";
-import type { AdjustWalletRequest, AdjustWalletResponse } from "@/lib/backend/api";
+import type {
+  AdjustWalletRequest,
+  AdjustWalletResponse,
+  StartViewAsRequest,
+  StartViewAsResponse,
+} from "@/lib/backend/api";
 import type { SpinAccount, UserProfile, WalletTransaction } from "@/types";
 import {
   Alert,
@@ -75,6 +81,7 @@ export function AdminCustomersPage() {
   const [adjustError, setAdjustError] = useState<string | null>(null);
   const [adjusting, setAdjusting] = useState(false);
   const adjustRequestId = useRef(newId("adj"));
+  const [viewingAs, setViewingAs] = useState<string | null>(null);
 
   const customers = useAsync(
     () => userService.listCustomers(CUSTOMER_LIST_LIMIT, filter === "all" ? undefined : filter),
@@ -270,12 +277,45 @@ export function AdminCustomersPage() {
       header: "",
       align: "right",
       render: (row) => (
-        <Button size="sm" variant="ghost" onClick={() => openDetail(row)}>
-          View
-        </Button>
+        <div className="flex justify-end gap-1.5">
+          <Button size="sm" variant="ghost" onClick={() => openDetail(row)}>
+            Details
+          </Button>
+          {row.role !== "admin" ? (
+            <Button
+              size="sm"
+              variant="outline"
+              loading={viewingAs === row.uid}
+              onClick={() => void viewAs(row)}
+            >
+              <Eye className="size-3.5" aria-hidden />
+              View as user
+            </Button>
+          ) : null}
+        </div>
       ),
     },
   ];
+
+  async function viewAs(row: UserProfile) {
+    // Opened before the await so popup blockers treat it as a direct click. If
+    // pop-ups are blocked the view opens in this tab; Exit returns to the admin.
+    const tab = window.open("about:blank", "_blank");
+    setViewingAs(row.uid);
+    try {
+      const { token } = await callBackend<StartViewAsRequest, StartViewAsResponse>("startViewAs", {
+        uid: row.uid,
+      });
+      const url = `/view-as#token=${encodeURIComponent(token)}`;
+      if (tab) tab.location.href = url;
+      else window.location.assign(url);
+    } catch (err) {
+      tab?.close();
+      toast.error(err instanceof Error ? err.message : "Could not open the customer's dashboard.");
+    } finally {
+      setViewingAs(null);
+    }
+  }
 
   function openDetail(row: UserProfile) {
     setSelected(row);
@@ -414,6 +454,24 @@ export function AdminCustomersPage() {
                 value={detail.data ? formatNumber(detail.data.orders.length) : "…"}
               />
             </div>
+
+            {selected.role !== "admin" ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-ivory/60 p-3">
+                <p className="text-[13px] text-muted">
+                  Open this customer's dashboard in a new tab. The view is read-only and logged in the audit
+                  trail.
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  loading={viewingAs === selected.uid}
+                  onClick={() => void viewAs(selected)}
+                >
+                  <Eye className="size-3.5" aria-hidden />
+                  View as user
+                </Button>
+              </div>
+            ) : null}
 
             <dl className="grid gap-2 sm:grid-cols-2">
               <Line label="Full name" value={selected.fullName} />

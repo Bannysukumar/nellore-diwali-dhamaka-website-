@@ -250,6 +250,16 @@ export interface AdjustWalletResponse {
   balancePaise: number;
 }
 
+export interface StartViewAsRequest {
+  uid: string;
+}
+
+/** A custom token for a read-only session as the customer. */
+export interface StartViewAsResponse {
+  token: string;
+  fullName: string;
+}
+
 export interface LogAdminActionRequest {
   action: string;
   entity: string;

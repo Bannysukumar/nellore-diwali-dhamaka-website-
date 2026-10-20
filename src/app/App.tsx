@@ -18,6 +18,7 @@ import { LoginPage } from "@/pages/public/LoginPage";
 import { RegisterPage } from "@/pages/public/RegisterPage";
 import { AccountSuspendedPage } from "@/pages/public/AccountSuspendedPage";
 import { RequireAuth, RequireAdmin } from "@/routes/guards";
+import { ViewAsBanner, ViewAsPage } from "@/features/auth/ViewAs";
 import { LoadingBlock } from "@/components/ui";
 
 /**
@@ -147,7 +148,10 @@ export function App() {
                 </div>
               }
             >
+              <ViewAsBanner />
               <Routes>
+                <Route path="view-as" element={<ViewAsPage />} />
+
                 {/* ---------------------------------------------------- public */}
                 <Route element={<PublicLayout />}>
                   <Route index element={<HomePage />} />

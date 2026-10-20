@@ -101,6 +101,15 @@ export async function signInWithPhone(phoneNumber: string): Promise<{ uid: strin
   return { uid: signedIn.localId, token: signedIn.idToken };
 }
 
+/** Exchanges a custom token (for example from `startViewAs`) for an ID token. */
+export async function signInWithCustomToken(token: string): Promise<string> {
+  const signedIn = await postJson<{ idToken: string }>(identity("accounts:signInWithCustomToken"), {
+    token,
+    returnSecureToken: true,
+  });
+  return signedIn.idToken;
+}
+
 export interface TestUser {
   uid: string;
   token: string;

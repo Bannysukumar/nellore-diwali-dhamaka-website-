@@ -142,6 +142,15 @@ describe("users", () => {
     await assertFails(customer().doc("users/carol").set({ role: "customer" }));
   });
 
+  it("keeps an admin view-as session read-only", async () => {
+    const viewAs = () =>
+      env.authenticatedContext("alice", { phone_number: "+919000000001", impersonatedBy: "admin1" }).firestore();
+    await assertSucceeds(viewAs().doc("users/alice").get());
+    await assertSucceeds(viewAs().doc("notifications/n1").get());
+    await assertFails(viewAs().doc("users/alice").update({ fullName: "Changed by admin", updatedAt: now }));
+    await assertFails(viewAs().doc("notifications/n1").update({ read: true }));
+  });
+
   it("lets an admin suspend but never change a role", async () => {
     await assertSucceeds(admin().doc("users/alice").update({ status: "suspended", suspendedReason: "Fraud", updatedAt: now }));
     await assertFails(admin().doc("users/alice").update({ role: "admin" }));

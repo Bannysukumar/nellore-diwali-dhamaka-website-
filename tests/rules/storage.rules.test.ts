@@ -47,6 +47,9 @@ describe("deposit screenshots", () => {
     await assertFails(upload(null, "deposit-screenshots/alice/anon.png"));
     await assertFails(upload("alice", "deposit-screenshots/alice/doc.pdf", png, { contentType: "application/pdf" }));
     await assertFails(upload("alice", "deposit-screenshots/alice/huge.png", new Uint8Array(5 * 1024 * 1024 + 1)));
+    await assertFails(
+      upload("alice", "deposit-screenshots/alice/admin-view.png", png, image, { impersonatedBy: "admin1" }),
+    );
   });
 
   it("are never publicly readable", async () => {

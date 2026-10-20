@@ -196,3 +196,43 @@ export const broadcastAnnouncement = onCall<unknown>(CALLABLE_OPTIONS, async (re
 
   return { delivered, createdAt };
 });
+
+/**
+ * Lets an administrator open a customer's dashboard without the customer's
+ * OTP. The returned custom token carries `impersonatedBy`, which makes the
+ * session read-only everywhere: `requireUser` rejects it in every callable and
+ * the security rules refuse its direct writes. Other administrators cannot be
+ * viewed this way, and every session is audit-logged.
+ */
+export const startViewAs = onCall<unknown>(
+  // Minting custom tokens needs `signBlob`, which the Firebase Admin SDK
+  // service account has and the default compute account does not.
+  { ...CALLABLE_OPTIONS, serviceAccount: "firebase-adminsdk-fbsvc@" },
+  async (request) => {
+    const admin = await requireUser(request.auth, { admin: true });
+    const data = requireObject<Record<string, unknown>>(request.data);
+    const uid = requireString(data, "uid", 128);
+    if (uid === admin.uid) failedPrecondition("Open your own dashboard directly.");
+
+    await enforceRateLimit(admin.uid, "startViewAs", { max: 30, windowSeconds: 3600 });
+
+    const targetSnap = await db().collection(COLLECTIONS.users).doc(uid).get();
+    if (!targetSnap.exists) failedPrecondition("That customer does not exist.");
+
+    const auth = getAuth();
+    const target = await auth.getUser(uid);
+    if (target.customClaims?.role === "admin") {
+      failedPrecondition("Administrator accounts cannot be opened in view-as mode.");
+    }
+
+    const token = await auth.createCustomToken(uid, { impersonatedBy: admin.uid });
+    await audit(
+      admin,
+      "customer.view_as",
+      COLLECTIONS.users,
+      uid,
+      `Opened a read-only view of ${String(targetSnap.get("fullName") ?? uid)}'s dashboard.`,
+    );
+    return { token, fullName: String(targetSnap.get("fullName") ?? "") };
+  },
+);

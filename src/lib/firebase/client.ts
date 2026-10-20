@@ -1,5 +1,12 @@
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
-import { getAuth, connectAuthEmulator, type Auth } from "firebase/auth";
+import {
+  browserSessionPersistence,
+  browserPopupRedirectResolver,
+  connectAuthEmulator,
+  getAuth,
+  initializeAuth,
+  type Auth,
+} from "firebase/auth";
 import { initializeFirestore, connectFirestoreEmulator, type Firestore } from "firebase/firestore";
 import { getStorage, connectStorageEmulator, type FirebaseStorage } from "firebase/storage";
 import { getFunctions, connectFunctionsEmulator, type Functions } from "firebase/functions";
@@ -56,9 +63,27 @@ export function firebaseApp(): FirebaseApp {
   return ensureApp();
 }
 
+/** Session-storage flag marking a tab that holds an admin "view as customer" session. */
+export const VIEW_AS_FLAG = "dd:view-as";
+export const VIEW_AS_PATH = "/view-as";
+
+/**
+ * A view-as tab keeps its sign-in in sessionStorage only, so the customer
+ * session never replaces the administrator's own session in other tabs.
+ */
+export function isViewAsTab(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.location.pathname === VIEW_AS_PATH || window.sessionStorage.getItem(VIEW_AS_FLAG) === "1";
+}
+
 export function firebaseAuth(): Auth {
   if (!auth) {
-    auth = getAuth(ensureApp());
+    auth = isViewAsTab()
+      ? initializeAuth(ensureApp(), {
+          persistence: browserSessionPersistence,
+          popupRedirectResolver: browserPopupRedirectResolver,
+        })
+      : getAuth(ensureApp());
     if (IS_EMULATOR) {
       connectAuthEmulator(auth, `http://${EMULATOR_HOST}:${EMULATOR_PORTS.auth}`, {
         disableWarnings: true,

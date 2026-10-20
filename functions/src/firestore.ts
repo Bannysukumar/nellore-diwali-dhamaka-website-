@@ -115,11 +115,23 @@ export async function readDraw(drawId: string): Promise<Draw & { id: string }> {
  * source of truth for administrator access. A `role: "admin"` field written
  * into Firestore by a client is ignored, and would be rejected by rules anyway.
  */
+/**
+ * Sessions an administrator opened with `startViewAs` carry the
+ * `impersonatedBy` claim and are strictly read-only: no callable may act on
+ * the customer's behalf.
+ */
+export function rejectViewAs(auth: CallableRequest["auth"]): void {
+  if (auth?.token.impersonatedBy) {
+    permissionDenied("This is a read-only admin view. Customers must make changes themselves.");
+  }
+}
+
 export async function requireUser(
   auth: CallableRequest["auth"],
   options: { admin?: boolean } = {},
 ): Promise<UserProfile & { id: string }> {
   if (!auth?.uid) unauthenticated("Please sign in to continue.");
+  rejectViewAs(auth);
 
   const profile = await readDoc<UserProfile & { id: string }>(COLLECTIONS.users, auth.uid);
   if (!profile) unauthenticated("Your account could not be found.");

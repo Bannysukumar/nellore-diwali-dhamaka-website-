@@ -41,6 +41,11 @@ service cloud.firestore {
       return signedIn() && request.auth.token.get('role', '') == 'admin';
     }
 
+    // Sessions opened by an administrator with `startViewAs` are read-only.
+    function viewOnly() {
+      return request.auth.token.get('impersonatedBy', null) != null;
+    }
+
     function changed() {
       return request.resource.data.diff(resource.data).affectedKeys();
     }
@@ -64,6 +69,7 @@ service cloud.firestore {
       // phoneMasked, referralCode, referredByUid, referralEligible.
       allow update: if signedIn()
         && uid() == userId
+        && !viewOnly()
         && changed().hasOnly(['fullName', 'email', 'address', 'updatedAt', 'lastLoginAt'])
         && (!('fullName' in request.resource.data)
             || (request.resource.data.fullName is string
@@ -266,6 +272,7 @@ service cloud.firestore {
       // A holder may mark their own notification as read, and nothing else.
       allow update: if signedIn()
         && uid() == resource.data.uid
+        && !viewOnly()
         && changed().hasOnly(['read'])
         && request.resource.data.read == true;
 
