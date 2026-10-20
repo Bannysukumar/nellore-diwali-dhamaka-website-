@@ -43,6 +43,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { TicketCounters, TicketGrid } from "@/features/tickets/TicketGrid";
 import { DrawStatusBadge } from "@/features/draws/DrawMeta";
 import { DrawPrizeCard } from "@/features/draws/DrawPrizeCard";
+import { ReadOnlyViewNotice, useReadOnlyView } from "@/features/auth/ViewAs";
 import { formatINR, formatINRPlain } from "@/utils/money";
 import { formatNumber } from "@/utils/format";
 import { newId } from "@/utils/id";
@@ -112,7 +113,8 @@ export function BookTicketsPage() {
     setParams(next);
     window.scrollTo({ top: 0, behavior: "auto" });
   };
-  const canPurchase = Boolean(draw && draw.status === "open" && settings.allowPaidDraws);
+  const readOnly = useReadOnlyView();
+  const canPurchase = Boolean(draw && draw.status === "open" && settings.allowPaidDraws && !readOnly);
 
   const stats = useAsync(
     async () => (draw ? await drawService.stats(draw.id) : null),
@@ -387,6 +389,7 @@ export function BookTicketsPage() {
       />
 
       <div className="page py-6">
+        <ReadOnlyViewNotice action="Buying tickets" className="mb-4" />
 
         {!settings.allowPaidDraws ? (
           <Alert tone="info" title="Paid draws are disabled" className="mb-4">
@@ -720,7 +723,9 @@ export function BookTicketsPage() {
                     >
                       {canPurchase
                         ? `Confirm ${selected.size || ""} ticket${selected.size === 1 ? "" : "s"}`
-                        : settings.allowPaidDraws
+                        : readOnly
+                          ? "Read-only admin view"
+                          : settings.allowPaidDraws
                           ? "Sales closed"
                           : "Purchasing disabled"}
                     </Button>

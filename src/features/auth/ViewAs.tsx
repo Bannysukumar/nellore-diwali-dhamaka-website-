@@ -49,6 +49,24 @@ export function ViewAsPage() {
   );
 }
 
+/** True in a tab an administrator opened with "View as user"; the backend rejects every action there. */
+export function useReadOnlyView(): boolean {
+  const { user } = useAuth();
+  return Boolean(user?.impersonatedBy);
+}
+
+/** Explains, before anything is clicked, why an action is unavailable in admin view. */
+export function ReadOnlyViewNotice({ action, className }: { action: string; className?: string }) {
+  const readOnly = useReadOnlyView();
+  if (!readOnly) return null;
+  return (
+    <Alert tone="info" className={className} title="Admin view is read-only">
+      {action} is switched off while you are viewing this customer&apos;s account, so nothing can be
+      changed on their behalf. The customer has to do this after signing in with their own mobile number.
+    </Alert>
+  );
+}
+
 /** Always-visible notice while an administrator is viewing as a customer. */
 export function ViewAsBanner() {
   const { user, profile } = useAuth();

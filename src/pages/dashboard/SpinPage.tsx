@@ -29,6 +29,7 @@ import {
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SpinWheel } from "@/features/spin/SpinWheel";
 import { ReferralLinkCard } from "@/features/referrals/ReferralLinkCard";
+import { ReadOnlyViewNotice, useReadOnlyView } from "@/features/auth/ViewAs";
 import { formatDateTime } from "@/utils/format";
 import { formatINR } from "@/utils/money";
 import { newId } from "@/utils/id";
@@ -41,6 +42,7 @@ const QUALIFICATION_COPY: Record<ReferralQualification, string> = {
 
 export function SpinPage() {
   const { uid } = useAuth();
+  const readOnly = useReadOnlyView();
   const { spin: spinConfig } = useSettings();
   const toast = useToast();
 
@@ -89,8 +91,8 @@ export function SpinPage() {
   const spinPricePaise = spinConfig?.spinPricePaise ?? 0;
   const balancePaise = wallet.data?.balancePaise ?? 0;
   const wheelLive = Boolean(spinConfig?.enabled) && campaignOpen && !spinning;
-  const canSpin = wheelLive && spinsLeft > 0;
-  const canBuySpin = wheelLive && spinPricePaise > 0 && balancePaise >= spinPricePaise;
+  const canSpin = wheelLive && !readOnly && spinsLeft > 0;
+  const canBuySpin = wheelLive && !readOnly && spinPricePaise > 0 && balancePaise >= spinPricePaise;
 
   const doSpin = async (payWithWallet: boolean) => {
     if (payWithWallet ? !canBuySpin : !canSpin) return;
@@ -167,6 +169,8 @@ export function SpinPage() {
           { label: "Spin wheel" },
         ]}
       />
+
+      <ReadOnlyViewNotice action="Spinning the wheel" className="mt-5" />
 
       <ReferralLinkCard className="mt-5 lg:hidden" />
 

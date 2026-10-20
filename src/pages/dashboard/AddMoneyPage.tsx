@@ -38,6 +38,7 @@ import { formatINR, parseRupeesToPaise, paiseToRupees } from "@/utils/money";
 import { newId } from "@/utils/id";
 import type { LowBalanceState } from "@/pages/public/BookTicketsPage";
 import { UPI_APPS, appsForPlatform, detectPlatform, upiLaunchUrl, type UpiApp } from "@/features/payments/upi";
+import { ReadOnlyViewNotice, useReadOnlyView } from "@/features/auth/ViewAs";
 import { copyText } from "@/utils/clipboard";
 
 const PRESETS = [20000, 50000, 100000, 200000, 500000];
@@ -104,6 +105,7 @@ const OTHER_WAYS =
 
 export function AddMoneyPage() {
   const { uid, profile } = useAuth();
+  const readOnly = useReadOnlyView();
   const settings = useSiteSettings();
   const { settings: rawSettings } = useSettings();
   const toast = useToast();
@@ -294,6 +296,7 @@ export function AddMoneyPage() {
   }, [file]);
 
   const loadQr = async () => {
+    if (readOnly) return;
     setError(null);
     if (!amountValid) {
       setError(
@@ -333,7 +336,7 @@ export function AddMoneyPage() {
   };
 
   const submit = async () => {
-    if (!uid || !profile || !qr) return;
+    if (!uid || !profile || !qr || readOnly) return;
     setError(null);
     const normalised = utr.trim().toUpperCase();
     if (!/^[A-Z0-9]{8,22}$/.test(normalised)) {
@@ -449,6 +452,8 @@ export function AddMoneyPage() {
           </Alert>
         ) : null}
 
+        <ReadOnlyViewNotice action="Adding money" className="mb-4" />
+
         {error ? (
           <Alert tone="danger" className="mb-4" title="We could not continue">
             {error}
@@ -498,7 +503,7 @@ export function AddMoneyPage() {
                     once spent on tickets; unspent balance can be refunded under the published policy.
                   </Alert>
 
-                  <Button block size="lg" disabled={!amountValid} onClick={() => void loadQr()}>
+                  <Button block size="lg" disabled={!amountValid || readOnly} onClick={() => void loadQr()}>
                     Get the payment QR code
                   </Button>
                 </CardBody>

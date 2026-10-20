@@ -12,6 +12,7 @@ import type {
   TransferFundsResponse,
 } from "@/lib/backend/api";
 import { walletService } from "@/services/walletService";
+import { ReadOnlyViewNotice, useReadOnlyView } from "@/features/auth/ViewAs";
 import {
   Alert,
   Button,
@@ -32,6 +33,7 @@ const MAX_TRANSFER_PAISE = 5_000_000;
 
 export function SendMoneyPage() {
   const { uid } = useAuth();
+  const readOnly = useReadOnlyView();
   const toast = useToast();
   const [phone, setPhone] = useState("");
   const [recipient, setRecipient] = useState<FindTransferRecipientResponse | null>(null);
@@ -56,6 +58,7 @@ export function SendMoneyPage() {
   const overBalance = Boolean(wallet.data) && amountPaise > balance;
 
   const find = async () => {
+    if (readOnly) return;
     setError(null);
     setRecipient(null);
     if (phone.replace(/\D/g, "").length < 10) {
@@ -143,6 +146,7 @@ export function SendMoneyPage() {
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-4">
+          <ReadOnlyViewNotice action="Sending money" />
           {error ? (
             <Alert tone="danger" title="We could not continue">
               {error}
@@ -194,6 +198,7 @@ export function SendMoneyPage() {
                     <Button
                       variant="outline"
                       loading={finding}
+                      disabled={readOnly}
                       onClick={() => void find()}
                       iconLeft={<Search className="size-4" aria-hidden />}
                     >
