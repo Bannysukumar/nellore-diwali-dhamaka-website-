@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   BadgeIndianRupee,
+  Check,
   CheckCircle2,
+  Copy,
   QrCode,
   ShieldCheck,
+  Smartphone,
   Upload,
 } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useAsync } from "@/hooks/useAsync";
 import { useAuth } from "@/app/AuthProvider";
 import { useSettings, useSiteSettings } from "@/app/SettingsProvider";
@@ -34,10 +37,68 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { formatINR, parseRupeesToPaise, paiseToRupees } from "@/utils/money";
 import { newId } from "@/utils/id";
 import type { LowBalanceState } from "@/pages/public/BookTicketsPage";
+import {
+  UPI_APPS,
+  appsForPlatform,
+  copyText,
+  detectPlatform,
+  upiLaunchUrl,
+  type UpiApp,
+} from "@/features/payments/upi";
 
 const PRESETS = [20000, 50000, 100000, 200000, 500000];
 
 type Step = "amount" | "pay" | "evidence" | "done";
+
+const DEPOSIT_SESSION_KEY = "dd:deposit-session";
+const DEPOSIT_SESSION_TTL_MS = 30 * 60_000;
+/** Shorter trips away are a cancelled app chooser, not a payment attempt. */
+const MIN_AWAY_MS = 2_500;
+const LAUNCH_TIMEOUT_MS = 3_000;
+
+interface DepositSession {
+  amountInput: string;
+  qr: PickPaymentQrResponse;
+  sessionKey: string;
+  requestId: string;
+  step: "pay" | "evidence";
+  launchedApp?: string;
+  lowBalance?: LowBalanceState | null;
+  savedAt: number;
+}
+
+function readDepositSession(): DepositSession | null {
+  try {
+    const raw = sessionStorage.getItem(DEPOSIT_SESSION_KEY);
+    if (!raw) return null;
+    const session = JSON.parse(raw) as DepositSession;
+    if (!session.qr?.qrId || Date.now() - session.savedAt > DEPOSIT_SESSION_TTL_MS) {
+      sessionStorage.removeItem(DEPOSIT_SESSION_KEY);
+      return null;
+    }
+    return session;
+  } catch {
+    return null;
+  }
+}
+
+function writeDepositSession(session: Omit<DepositSession, "savedAt">) {
+  try {
+    sessionStorage.setItem(DEPOSIT_SESSION_KEY, JSON.stringify({ ...session, savedAt: Date.now() }));
+  } catch {
+    /* Storage unavailable: the flow still works, it just cannot survive a reload. */
+  }
+}
+
+function clearDepositSession() {
+  try {
+    sessionStorage.removeItem(DEPOSIT_SESSION_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+const appLabel = (id: string) => UPI_APPS.find((app) => app.id === id)?.name ?? "your UPI app";
 
 export function AddMoneyPage() {
   const { uid, profile } = useAuth();
@@ -45,20 +106,40 @@ export function AddMoneyPage() {
   const { settings: rawSettings } = useSettings();
   const toast = useToast();
   const location = useLocation();
-  const lowBalance = (location.state as LowBalanceState | null) ?? null;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [restored] = useState(readDepositSession);
+  const [missingAppId] = useState(() => searchParams.get("upi_missing"));
+  const returnedAfterReload = Boolean(restored?.launchedApp && !missingAppId);
+  const lowBalance = (location.state as LowBalanceState | null) ?? restored?.lowBalance ?? null;
   const prefilled = useRef(false);
+  const [platform] = useState(() => detectPlatform());
+  const apps = useMemo(() => appsForPlatform(platform), [platform]);
 
-  const [step, setStep] = useState<Step>("amount");
-  const [amountInput, setAmountInput] = useState("");
-  const [qr, setQr] = useState<PickPaymentQrResponse | null>(null);
+  const [step, setStep] = useState<Step>(() => {
+    if (!restored) return "amount";
+    if (missingAppId) return "pay";
+    return returnedAfterReload ? "evidence" : restored.step;
+  });
+  const [amountInput, setAmountInput] = useState(restored?.amountInput ?? "");
+  const [qr, setQr] = useState<PickPaymentQrResponse | null>(restored?.qr ?? null);
+  const [launchedApp, setLaunchedApp] = useState<string | null>(null);
+  const [returnedFrom, setReturnedFrom] = useState<string | null>(
+    returnedAfterReload ? (restored?.launchedApp ?? null) : null,
+  );
+  const [launchProblem, setLaunchProblem] = useState<string | null>(
+    missingAppId
+      ? `${appLabel(missingAppId)} is not installed on this phone. Choose another app, or pay using the UPI ID or QR code.`
+      : null,
+  );
+  const [copied, setCopied] = useState<string | null>(null);
   const [utr, setUtr] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SubmitDepositResponse | null>(null);
-  const sessionKey = useRef(newId("dep"));
-  const requestId = useRef(newId("dreq"));
+  const sessionKey = useRef(restored?.sessionKey ?? newId("dep"));
+  const requestId = useRef(restored?.requestId ?? newId("dreq"));
 
   const wallet = useAsync(
     async () => (uid ? await walletService.account(uid) : null),
@@ -85,6 +166,93 @@ export function AddMoneyPage() {
     const suggested = Math.min(Math.max(wholeRupees, settings.minDepositPaise), settings.maxDepositPaise);
     setAmountInput((current) => current || String(paiseToRupees(suggested)));
   }, [lowBalance, depositsConfigured, settings.minDepositPaise, settings.maxDepositPaise]);
+
+  useEffect(() => {
+    if (missingAppId) setSearchParams({}, { replace: true });
+  }, [missingAppId, setSearchParams]);
+
+  const saveSession = (overrides: Partial<DepositSession> = {}) => {
+    if (!qr || (step !== "pay" && step !== "evidence")) return;
+    writeDepositSession({
+      amountInput,
+      qr,
+      sessionKey: sessionKey.current,
+      requestId: requestId.current,
+      step,
+      launchedApp: launchedApp ?? undefined,
+      lowBalance,
+      ...overrides,
+    });
+  };
+
+  useEffect(() => {
+    if (qr && (step === "pay" || step === "evidence")) saveSession();
+    else clearDepositSession();
+    // saveSession reads exactly these values.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, qr, amountInput, launchedApp, lowBalance]);
+
+  /* Coming back from the UPI app — whether it paid or not — lands on the proof step. */
+  useEffect(() => {
+    if (!launchedApp) return;
+    let leftAt: number | null = null;
+    const away = () => {
+      if (leftAt === null) leftAt = Date.now();
+    };
+    const back = () => {
+      if (leftAt === null) return;
+      const awayMs = Date.now() - leftAt;
+      leftAt = null;
+      if (awayMs < MIN_AWAY_MS) return;
+      setReturnedFrom(launchedApp);
+      setLaunchedApp(null);
+      setLaunchProblem(null);
+      setStep("evidence");
+    };
+    const onVisibility = () => (document.visibilityState === "hidden" ? away() : back());
+    const timer = window.setTimeout(() => {
+      if (leftAt === null && document.visibilityState === "visible") {
+        setLaunchProblem(
+          `If ${appLabel(launchedApp)} did not open, it may not be installed. Choose another app, or pay using the UPI ID or QR code.`,
+        );
+        setLaunchedApp(null);
+      }
+    }, LAUNCH_TIMEOUT_MS);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("blur", away);
+    window.addEventListener("focus", back);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("blur", away);
+      window.removeEventListener("focus", back);
+    };
+  }, [launchedApp]);
+
+  const launchApp = (app: UpiApp | null) => {
+    if (!qr) return;
+    const appId = app?.id ?? "any";
+    setLaunchProblem(null);
+    setReturnedFrom(null);
+    setLaunchedApp(appId);
+    saveSession({ launchedApp: appId });
+    window.location.href = upiLaunchUrl(
+      app,
+      platform,
+      { upiId: qr.upiId, payeeName: qr.payeeName, amountPaise, note: "Wallet deposit" },
+      `${window.location.origin}/dashboard/add-money?upi_missing=${appId}`,
+    );
+  };
+
+  const copy = async (key: string, text: string, label: string) => {
+    if (await copyText(text)) {
+      setCopied(key);
+      window.setTimeout(() => setCopied((current) => (current === key ? null : current)), 2000);
+      toast.success("Copied", `${label} copied to the clipboard.`);
+    } else {
+      toast.error("Could not copy", `Select the ${label} and copy it manually.`);
+    }
+  };
 
   useEffect(() => {
     if (!file) {
@@ -175,8 +343,11 @@ export function AddMoneyPage() {
   };
 
   const reset = () => {
+    clearDepositSession();
     sessionKey.current = newId("dep");
     requestId.current = newId("dreq");
+    setReturnedFrom(null);
+    setLaunchProblem(null);
     setStep("amount");
     setAmountInput("");
     setQr(null);
@@ -310,38 +481,90 @@ export function AddMoneyPage() {
                 <CardHeader
                   icon={QrCode}
                   title="2. Pay the exact amount"
-                  description="Scan with any UPI app, then come back and submit your reference."
+                  description="Pay with a UPI app or scan the QR code, then come back and upload your screenshot."
                 />
                 <CardBody className="space-y-4">
-                  <div className="grid gap-4 sm:grid-cols-[220px_1fr]">
-                    <div className="rounded-2xl border border-line bg-white p-3 text-center">
-                      <img
-                        src={qr.imageUrl}
-                        alt={`UPI QR code for ${qr.payeeName}`}
-                        className="mx-auto aspect-square w-full max-w-[200px] rounded-lg object-contain"
-                      />
-                      <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted">
-                        {qr.label}
+                  <dl className="grid gap-2.5 text-[13px] sm:grid-cols-2">
+                    <CopyField
+                      label="Amount to pay"
+                      copied={copied === "amount"}
+                      onCopy={() => void copy("amount", String(paiseToRupees(amountPaise)), "Amount")}
+                    >
+                      <span className="font-display text-[24px] font-bold tabular-nums text-brand">
+                        {formatINR(amountPaise)}
+                      </span>
+                    </CopyField>
+                    <CopyField
+                      label="Pay to UPI ID"
+                      copied={copied === "upi"}
+                      onCopy={() => void copy("upi", qr.upiId, "UPI ID")}
+                    >
+                      <span className="block break-all font-mono text-[14px] font-semibold text-ink">{qr.upiId}</span>
+                      <span className="block text-[12px] text-muted">{qr.payeeName}</span>
+                    </CopyField>
+                  </dl>
+                  {qr.appHint ? <p className="text-[12px] text-muted">{qr.appHint}</p> : null}
+
+                  {apps.length ? (
+                    <div className="rounded-2xl border border-line bg-ivory/40 p-3 sm:p-4">
+                      <p className="flex items-center gap-2 text-[13.5px] font-semibold text-ink">
+                        <Smartphone className="size-4 text-brand" aria-hidden />
+                        Pay with a UPI app on this phone
+                      </p>
+                      <p className="mt-0.5 text-[12px] leading-relaxed text-muted">
+                        The UPI ID and amount are filled in for you. After paying — or if the payment fails — come
+                        back here to upload the screenshot.
+                      </p>
+                      <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                        {platform === "android" ? (
+                          <UpiAppButton
+                            name="All UPI apps"
+                            hint="Installed apps"
+                            short="UPI"
+                            color="#0f7a4f"
+                            onClick={() => launchApp(null)}
+                          />
+                        ) : null}
+                        {apps.map((app) => (
+                          <UpiAppButton
+                            key={app.id}
+                            name={app.name}
+                            short={app.short}
+                            color={app.color}
+                            onClick={() => launchApp(app)}
+                          />
+                        ))}
+                      </div>
+                      <p className="mt-3 text-[11.5px] leading-relaxed text-muted">
+                        Some apps block payments started from a link. If that happens, copy the UPI ID above and
+                        pay inside the app, or scan the QR code below.
                       </p>
                     </div>
-                    <dl className="space-y-2.5 text-[13px]">
-                      <div className="rounded-xl border border-line bg-ivory/60 p-3">
-                        <dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted">
-                          Amount to pay
-                        </dt>
-                        <dd className="font-display text-[24px] font-bold tabular-nums text-brand">
-                          {formatINR(amountPaise)}
-                        </dd>
-                      </div>
-                      <div className="rounded-xl border border-line bg-ivory/60 p-3">
-                        <dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted">
-                          Payee
-                        </dt>
-                        <dd className="font-semibold text-ink">{qr.payeeName}</dd>
-                        <dd className="mt-0.5 font-mono text-[12.5px] text-muted">{qr.upiId}</dd>
-                      </div>
-                      {qr.appHint ? <p className="text-[12px] text-muted">{qr.appHint}</p> : null}
-                    </dl>
+                  ) : (
+                    <Alert tone="info" title="Paying from a computer?">
+                      Scan the QR code below with any UPI app, or open this page on your phone to pay in one tap with
+                      the amount filled in.
+                    </Alert>
+                  )}
+
+                  {launchProblem ? (
+                    <Alert tone="warning" title="App did not open">
+                      {launchProblem}
+                    </Alert>
+                  ) : null}
+
+                  <div className="flex flex-col items-center gap-2 rounded-2xl border border-line bg-white p-3 text-center sm:flex-row sm:text-left">
+                    <img
+                      src={qr.imageUrl}
+                      alt={`UPI QR code for ${qr.payeeName}`}
+                      className="aspect-square w-full max-w-[180px] rounded-lg object-contain"
+                    />
+                    <div className="space-y-1 sm:pl-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted">{qr.label}</p>
+                      <p className="text-[12.5px] leading-relaxed text-muted">
+                        Or scan this QR code from any UPI app and enter {formatINR(amountPaise)} yourself.
+                      </p>
+                    </div>
                   </div>
 
                   <Alert tone="warning" title="Pay the exact amount">
@@ -354,7 +577,7 @@ export function AddMoneyPage() {
                       Change amount
                     </Button>
                     <Button onClick={() => setStep("evidence")} iconRight={<Upload className="size-4" aria-hidden />}>
-                      I have paid — submit proof
+                      I have paid — upload screenshot
                     </Button>
                   </div>
                 </CardBody>
@@ -369,6 +592,23 @@ export function AddMoneyPage() {
                   description="An administrator matches this against the operator's banking records."
                 />
                 <CardBody className="space-y-4">
+                  {returnedFrom ? (
+                    <Alert tone="info" title={`Back from ${appLabel(returnedFrom)}`}>
+                      If the payment of {formatINR(amountPaise)} succeeded, enter the UTR / reference number and
+                      upload a screenshot of the success screen below. If it failed or you cancelled it,{" "}
+                      <button
+                        type="button"
+                        className="font-semibold text-brand hover:underline"
+                        onClick={() => {
+                          setReturnedFrom(null);
+                          setStep("pay");
+                        }}
+                      >
+                        try paying again
+                      </button>
+                      . If money left your account but the app shows a failure, keep the UTR and contact support.
+                    </Alert>
+                  ) : null}
                   <div className="space-y-1.5">
                     <Label htmlFor="deposit-utr" required hint="8–22 letters/digits">
                       UTR / reference number
@@ -533,5 +773,67 @@ export function AddMoneyPage() {
         </div>
       </div>
     </>
+  );
+}
+
+function CopyField({
+  label,
+  copied,
+  onCopy,
+  children,
+}: {
+  label: string;
+  copied: boolean;
+  onCopy: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-xl border border-line bg-ivory/60 p-3">
+      <div className="min-w-0">
+        <dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted">{label}</dt>
+        <dd>{children}</dd>
+      </div>
+      <Button
+        size="sm"
+        variant={copied ? "success" : "outline"}
+        onClick={onCopy}
+        iconLeft={copied ? <Check className="size-3.5" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
+        aria-label={`Copy ${label.toLowerCase()}`}
+      >
+        {copied ? "Copied" : "Copy"}
+      </Button>
+    </div>
+  );
+}
+
+function UpiAppButton({
+  name,
+  short,
+  color,
+  hint,
+  onClick,
+}: {
+  name: string;
+  short: string;
+  color: string;
+  hint?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex min-h-[88px] flex-col items-center justify-center gap-1.5 rounded-xl border border-line bg-paper p-2 text-center transition hover:border-gold hover:shadow-sm active:scale-[0.98]"
+    >
+      <span
+        className="grid size-10 place-items-center rounded-xl text-[13px] font-bold text-white"
+        style={{ backgroundColor: color }}
+        aria-hidden
+      >
+        {short}
+      </span>
+      <span className="text-[11.5px] font-semibold leading-tight text-ink">{name}</span>
+      {hint ? <span className="text-[10px] leading-tight text-muted">{hint}</span> : null}
+    </button>
   );
 }
