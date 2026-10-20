@@ -20,7 +20,7 @@ import {
 } from "@/components/ui";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DrawStatusBadge } from "@/features/draws/DrawMeta";
-import { FlipTicket } from "@/features/tickets/FlipTicket";
+import { FlipTicket, TicketDownloadButton } from "@/features/tickets/FlipTicket";
 import { formatINR } from "@/utils/money";
 import { formatDateTime, formatNumber } from "@/utils/format";
 
@@ -174,18 +174,32 @@ export function MyTicketsPage() {
                   ) : null}
 
                   <p className="text-[12px] text-muted">
-                    Tap a ticket to flip it and see your Diwali discount coupon.
+                    Tap a ticket to flip it and see your Diwali discount coupon. Download saves both
+                    sides as an image.
                   </p>
                   <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
                     {group.tickets.map((ticket) => (
                       <div key={ticket.id} className="space-y-1.5">
-                        <FlipTicket ticket={ticket} draw={group.draw} holderName={profile?.fullName} />
-                        <Link
-                          to={`/dashboard/tickets/${ticket.id}`}
-                          className="inline-flex text-[12px] font-semibold text-brand hover:underline"
-                        >
-                          Ticket #{ticket.numberLabel} details
-                        </Link>
+                        <FlipTicket
+                          ticket={ticket}
+                          draw={group.draw}
+                          holderName={profile?.fullName}
+                          holderPhone={profile?.phone}
+                        />
+                        <div className="flex items-center justify-between gap-2">
+                          <Link
+                            to={`/dashboard/tickets/${ticket.id}`}
+                            className="inline-flex text-[12px] font-semibold text-brand hover:underline"
+                          >
+                            Ticket #{ticket.numberLabel} details
+                          </Link>
+                          <TicketDownloadButton
+                            ticket={ticket}
+                            draw={group.draw}
+                            holderName={profile?.fullName}
+                            holderPhone={profile?.phone}
+                          />
+                        </div>
                       </div>
                     ))}
                   </div>

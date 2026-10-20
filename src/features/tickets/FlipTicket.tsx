@@ -1,35 +1,15 @@
 import { useMemo, useState } from "react";
-import { RotateCw, Ticket as TicketIcon, Trophy } from "lucide-react";
+import { Download, RotateCw, Ticket as TicketIcon, Trophy } from "lucide-react";
 import type { Draw, Ticket } from "@/types";
+import { useToast } from "@/app/ToastProvider";
+import { Button } from "@/components/ui";
 import { cn } from "@/utils/cn";
 import { formatINR } from "@/utils/money";
 import { formatDateTime } from "@/utils/format";
-
-/** Bar pattern seeded by the ticket id; it encodes nothing and cannot be scanned. */
-function useDummyBars(seed: string) {
-  return useMemo(() => {
-    let state = 2166136261;
-    for (let i = 0; i < seed.length; i += 1) state = Math.imul(state ^ seed.charCodeAt(i), 16777619);
-    state ||= 1;
-    const next = () => {
-      state ^= state << 13;
-      state ^= state >>> 17;
-      state ^= state << 5;
-      return (state >>> 0) / 4294967296;
-    };
-    const bars: Array<{ y: number; h: number }> = [];
-    let y = 0;
-    while (y < 120) {
-      const h = 1 + Math.floor(next() * 3);
-      bars.push({ y, h });
-      y += h + 1 + Math.floor(next() * 3);
-    }
-    return { bars, total: y };
-  }, [seed]);
-}
+import { SITE_HOST, downloadTicketImage, dummyBars, formatMobile } from "./ticketImage";
 
 function DummyBarcode({ seed }: { seed: string }) {
-  const { bars, total } = useDummyBars(seed);
+  const { bars, total } = useMemo(() => dummyBars(seed), [seed]);
   return (
     <svg
       viewBox={`0 0 30 ${total}`}
@@ -47,14 +27,54 @@ function DummyBarcode({ seed }: { seed: string }) {
 
 const notch = "absolute size-5 rounded-full bg-paper";
 
-export function FlipTicket({
+export function TicketDownloadButton({
   ticket,
   draw,
   holderName,
+  holderPhone,
 }: {
   ticket: Ticket;
   draw: Draw | null;
   holderName?: string;
+  holderPhone?: string;
+}) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+
+  const download = async () => {
+    setBusy(true);
+    try {
+      await downloadTicketImage(ticket, draw, { name: holderName, phone: holderPhone });
+    } catch (error) {
+      toast.error("Download failed", error instanceof Error ? error.message : "Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      loading={busy}
+      onClick={() => void download()}
+      iconLeft={<Download className="size-3.5" aria-hidden />}
+    >
+      Download
+    </Button>
+  );
+}
+
+export function FlipTicket({
+  ticket,
+  draw,
+  holderName,
+  holderPhone,
+}: {
+  ticket: Ticket;
+  draw: Draw | null;
+  holderName?: string;
+  holderPhone?: string;
 }) {
   const [flipped, setFlipped] = useState(false);
   const confirmed = ticket.status === "booked";
@@ -96,6 +116,10 @@ export function FlipTicket({
               <div>
                 <dt className="text-ivory/60">Paid</dt>
                 <dd className="font-semibold tabular-nums">{formatINR(ticket.pricePaise)}</dd>
+              </div>
+              <div className="col-span-2">
+                <dt className="text-ivory/60">Mobile number</dt>
+                <dd className="font-semibold tabular-nums">{holderPhone ? formatMobile(holderPhone) : "—"}</dd>
               </div>
               <div className="col-span-2">
                 <dt className="text-ivory/60">Draw date</dt>
@@ -158,7 +182,8 @@ export function FlipTicket({
                 Your coupon code appears once this ticket is confirmed.
               </p>
             )}
-            <p className="mt-1 flex items-center gap-1 text-[10px] text-muted">
+            <p className="mt-1.5 text-[12px] font-extrabold tracking-[0.02em] text-brand">{SITE_HOST}</p>
+            <p className="mt-0.5 flex items-center gap-1 text-[10px] text-muted">
               Ts &amp; Cs apply ·
               <RotateCw className="size-3" aria-hidden />
               Tap to see ticket
