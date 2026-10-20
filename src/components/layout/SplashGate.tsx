@@ -9,6 +9,8 @@ import { Button } from "@/components/ui";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 const DISMISS_KEY = "ndd.splash.dismissedAt";
+/** A "visit" is one browser session; live settings snapshots must not re-open a dismissed splash. */
+const SESSION_KEY = "ndd.splash.dismissedThisVisit";
 
 /**
  * Admin-configured festival splash.
@@ -28,6 +30,10 @@ export function SplashGate() {
       setVisible(false);
       return;
     }
+    if (sessionStorage.getItem(SESSION_KEY)) {
+      setVisible(false);
+      return;
+    }
     if (splash.dismissDays > 0) {
       const dismissedAt = Number(localStorage.getItem(DISMISS_KEY) ?? 0);
       const expiresAt = dismissedAt + splash.dismissDays * 86_400_000;
@@ -43,6 +49,7 @@ export function SplashGate() {
 
   const dismiss = (followCta = false) => {
     setVisible(false);
+    sessionStorage.setItem(SESSION_KEY, "1");
     if (splash?.dismissDays) localStorage.setItem(DISMISS_KEY, String(Date.now()));
     if (followCta && splash?.ctaHref) navigate(splash.ctaHref);
   };

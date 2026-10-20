@@ -17,11 +17,11 @@ export function ScrollToTop() {
 /** Shell for every public page: header, content, footer and mobile nav. */
 export function PublicLayout() {
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex min-h-dvh flex-col pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
       <SplashGate />
       <ScrollToTop />
       <Header />
-      <main id="main" className="flex-1 pb-24 lg:pb-0">
+      <main id="main" className="flex-1">
         <ErrorBoundary>
           <Outlet />
         </ErrorBoundary>
