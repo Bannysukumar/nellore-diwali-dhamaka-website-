@@ -1,9 +1,10 @@
-import { Home, Ticket, Trophy, User, Wallet } from "lucide-react";
+import { Home, Sparkles, Ticket, Trophy, User, Wallet } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/app/AuthProvider";
 import { cn } from "@/utils/cn";
 
 const items = [
+  { to: "/dashboard/spin", label: "Spin", icon: Sparkles, end: false, highlight: true },
   { to: "/", label: "Home", icon: Home, end: true },
   { to: "/draws", label: "Draws", icon: Trophy, end: false },
   { to: "/book", label: "Book", icon: Ticket, end: false },
@@ -18,24 +19,32 @@ const items = [
 export function BottomNav() {
   const { user } = useAuth();
   const { pathname } = useLocation();
-  /** Wallet has its own tab, so it must not also light up Account. */
+  /** Spin and Wallet have their own tabs, so they must not also light up Account. */
   const overrideActive = (to: string): boolean | null =>
-    to === "/dashboard" ? pathname.startsWith("/dashboard") && !pathname.startsWith("/dashboard/wallet") : null;
+    to === "/dashboard"
+      ? pathname.startsWith("/dashboard") &&
+        !pathname.startsWith("/dashboard/wallet") &&
+        !pathname.startsWith("/dashboard/spin")
+      : null;
   return (
     <nav
       aria-label="Primary mobile"
       className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-line bg-paper/95 backdrop-blur-md lg:hidden"
     >
-      <ul className="mx-auto grid max-w-lg grid-cols-5">
-        {items.map(({ to, label, icon: Icon, end }) => (
+      <ul className="mx-auto grid max-w-lg grid-cols-6">
+        {items.map(({ to, label, icon: Icon, end, highlight }) => (
           <li key={to}>
             <NavLink
               to={to}
               end={end}
               className={({ isActive }) =>
                 cn(
-                  "flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-[10.5px] font-semibold transition",
-                  (overrideActive(to) ?? isActive) ? "text-brand" : "text-muted",
+                  "flex min-h-14 flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 text-[10.5px] font-semibold transition",
+                  highlight
+                    ? "text-gold-deep"
+                    : (overrideActive(to) ?? isActive)
+                      ? "text-brand"
+                      : "text-muted",
                 )
               }
             >
@@ -44,7 +53,14 @@ export function BottomNav() {
                   <span
                     className={cn(
                       "grid size-8 place-items-center rounded-full transition",
-                      (overrideActive(to) ?? isActive) ? "bg-brand/10" : "",
+                      highlight
+                        ? cn(
+                            "bg-gradient-to-br from-gold to-gold-deep text-white shadow-[0_4px_12px_-4px_rgb(168_132_42/0.8)]",
+                            isActive && "ring-2 ring-gold/40 ring-offset-1 ring-offset-paper",
+                          )
+                        : (overrideActive(to) ?? isActive)
+                          ? "bg-brand/10"
+                          : "",
                     )}
                   >
                     <Icon className="size-[18px]" aria-hidden />

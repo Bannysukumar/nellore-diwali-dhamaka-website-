@@ -24,11 +24,11 @@ import { formatINR } from "@/utils/money";
 import { initials } from "@/utils/mask";
 
 const LINKS = [
+  { to: "/dashboard/spin", label: "Spin wheel", icon: Sparkles, end: false },
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard, end: true },
   { to: "/dashboard/wallet", label: "Wallet", icon: Wallet, end: false },
   { to: "/dashboard/tickets", label: "My tickets", icon: Ticket, end: false },
   { to: "/dashboard/referrals", label: "Referrals", icon: Users, end: false },
-  { to: "/dashboard/spin", label: "Spin wheel", icon: Sparkles, end: false },
   { to: "/dashboard/history", label: "Draw history", icon: History, end: false },
   { to: "/dashboard/notifications", label: "Notifications", icon: Bell, end: false },
   { to: "/dashboard/profile", label: "Profile", icon: UserRound, end: false },
