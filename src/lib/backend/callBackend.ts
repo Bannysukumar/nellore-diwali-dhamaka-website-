@@ -82,6 +82,7 @@ export const BACKEND_FUNCTIONS = [
   "startViewAs",
   "findTransferRecipient",
   "transferFunds",
+  "getProductCoupons",
 ] as const;
 
 export type BackendFunctionName = (typeof BACKEND_FUNCTIONS)[number];

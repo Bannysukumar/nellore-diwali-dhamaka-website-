@@ -18,6 +18,7 @@ export { runDraw, publishDrawResults, cancelDraw, moderateWinner } from "./draws
 export { setAdminClaim, logAdminAction, broadcastAnnouncement, startViewAs } from "./admin.js";
 export { adjustWallet } from "./wallet.js";
 export { findTransferRecipient, transferFunds } from "./transfers.js";
+export { getProductCoupons } from "./products.js";
 
 /* --------------------------------------------------------------- scheduled  */
 export {

@@ -279,6 +279,11 @@ export interface TransferFundsResponse {
   createdAt: string;
 }
 
+export interface ProductCouponsResponse {
+  eligible: boolean;
+  coupons: Record<string, string>;
+}
+
 /** A custom token for a read-only session as the customer. */
 export interface StartViewAsResponse {
   token: string;

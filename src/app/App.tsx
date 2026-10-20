@@ -83,6 +83,15 @@ const AdminLayout = lazy(() =>
 const AdminOverviewPage = lazy(() =>
   import("@/pages/admin/OverviewPage").then((m) => ({ default: m.AdminOverviewPage })),
 );
+const AdminProductsPage = lazy(() =>
+  import("@/pages/admin/ProductsPage").then((m) => ({ default: m.AdminProductsPage })),
+);
+const ProductsPage = lazy(() =>
+  import("@/pages/public/ProductsPage").then((m) => ({ default: m.ProductsPage })),
+);
+const DashboardProductsPage = lazy(() =>
+  import("@/pages/dashboard/ProductsPage").then((m) => ({ default: m.DashboardProductsPage })),
+);
 const AdminBannersPage = lazy(() =>
   import("@/pages/admin/BannersPage").then((m) => ({ default: m.AdminBannersPage })),
 );
@@ -164,6 +173,7 @@ export function App() {
                   <Route path="draws" element={<DrawsPage />} />
                   <Route path="draws/:slug" element={<DrawDetailPage />} />
                   <Route path="winners" element={<WinnersPage />} />
+                  <Route path="products" element={<ProductsPage />} />
                   <Route path="book" element={<BookTicketsPage />} />
                   <Route path="about" element={<AboutPage />} />
                   <Route path="contact" element={<ContactPage />} />
@@ -182,6 +192,7 @@ export function App() {
                       <Route path="wallet" element={<WalletPage />} />
                       <Route path="add-money" element={<AddMoneyPage />} />
                       <Route path="send-money" element={<SendMoneyPage />} />
+                      <Route path="products" element={<DashboardProductsPage />} />
                       <Route path="tickets" element={<MyTicketsPage />} />
                       <Route path="tickets/:ticketId" element={<TicketDetailPage />} />
                       <Route path="referrals" element={<ReferralsPage />} />
@@ -198,6 +209,7 @@ export function App() {
                 <Route element={<RequireAdmin />}>
                   <Route path="admin" element={<AdminLayout />}>
                     <Route index element={<AdminOverviewPage />} />
+                    <Route path="products" element={<AdminProductsPage />} />
                     <Route path="banners" element={<AdminBannersPage />} />
                     <Route path="splash" element={<AdminSplashPage />} />
                     <Route path="draws" element={<AdminDrawsPage />} />

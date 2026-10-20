@@ -65,6 +65,9 @@ export const COLLECTIONS = {
   /** One document per admin balance adjustment (id from requestId); server-only. */
   walletAdjustments: "walletAdjustments",
   walletTransfers: "walletTransfers",
+  products: "products",
+  /** Coupon codes keyed by product id; admin-only in rules, handed out by `getProductCoupons`. */
+  productCoupons: "productCoupons",
 } as const;
 
 /** Firestore rejects `undefined`; strip it so optional fields stay optional. */

@@ -398,6 +398,23 @@ export interface DrawAssignment {
 
 export type BannerSlot = "home_hero" | "promo" | "draw" | "splash";
 
+/** Shop catalogue item. Coupon codes live in admin-only `productCoupons/{id}`. */
+export interface Product {
+  id: string;
+  name: string;
+  description?: string;
+  imageUrl: string;
+  imagePath: string;
+  originalPricePaise: number;
+  discountPricePaise: number;
+  /** Price for ticket buyers who use the product's coupon code. */
+  couponPricePaise?: number;
+  active: boolean;
+  sortOrder: number;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+}
+
 export interface Banner {
   id: string;
   slot: BannerSlot;

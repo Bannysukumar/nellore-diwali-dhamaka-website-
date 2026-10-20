@@ -14,6 +14,7 @@ const NAV = [
   { to: "/draws", label: "Draws" },
   { to: "/book", label: "Book Tickets" },
   { to: "/winners", label: "Winners" },
+  { to: "/products", label: "Products" },
   { to: "/about", label: "About" },
   { to: "/faqs", label: "FAQs" },
   { to: "/contact", label: "Contact" },
@@ -48,7 +49,7 @@ export function Header() {
         <div className={cn(container, "flex h-16 items-center justify-between gap-4")}>
           <Logo />
 
-          <nav aria-label="Primary" className="hidden items-center gap-1 lg:flex">
+          <nav aria-label="Primary" className="hidden items-center gap-0.5 lg:flex xl:gap-1">
             {NAV.map((item) => (
               <NavLink
                 key={item.to}
@@ -56,7 +57,7 @@ export function Header() {
                 onClick={() => setOpen(false)}
                 className={({ isActive }) =>
                   cn(
-                    "rounded-lg px-3 py-2 text-[13.5px] font-semibold transition",
+                    "whitespace-nowrap rounded-lg px-2 py-2 text-[13.5px] font-semibold transition xl:px-3",
                     isActive
                       ? "bg-brand/10 text-brand"
                       : "text-muted hover:bg-paper hover:text-ink",

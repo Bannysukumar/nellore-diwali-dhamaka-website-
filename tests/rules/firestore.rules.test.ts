@@ -36,6 +36,20 @@ const draw = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+const product = (overrides: Record<string, unknown> = {}) => ({
+  name: "Diya lamp set",
+  imageUrl: "https://example.test/lamp.png",
+  imagePath: "products/lamp.png",
+  originalPricePaise: 50_000,
+  discountPricePaise: 40_000,
+  couponPricePaise: 35_000,
+  active: true,
+  sortOrder: 1,
+  createdAt: now,
+  updatedAt: now,
+  ...overrides,
+});
+
 const customer = () => env.authenticatedContext("alice", { phone_number: "+919000000001" }).firestore();
 const otherCustomer = () => env.authenticatedContext("bob").firestore();
 const admin = () => env.authenticatedContext("admin1", { role: "admin" }).firestore();
@@ -83,6 +97,9 @@ beforeEach(async () => {
     await db.doc("users/0xabc123").set({ wallet: "0xabc123", referralCode: "W1" });
     await db.doc("tokenomics/main").set({ supply: 1 });
     await db.doc("adminEmails/ops@uwgea.test").set({ addedAt: now });
+    await db.doc("products/lamp").set(product());
+    await db.doc("products/hidden").set(product({ active: false }));
+    await db.doc("productCoupons/lamp").set({ code: "LAMP-50" });
   });
 });
 
@@ -261,6 +278,44 @@ describe("results and winners", () => {
     await assertSucceeds(customer().doc("winnerAnnouncements/w1").get());
     await assertFails(customer().doc("winnerAnnouncements/w2").get());
     await assertSucceeds(anonymous().doc("winnerAnnouncements/w3").get());
+  });
+});
+
+describe("shop products", () => {
+  it("shows only active products to the public", async () => {
+    await assertSucceeds(anonymous().doc("products/lamp").get());
+    await assertFails(anonymous().doc("products/hidden").get());
+    await assertSucceeds(anonymous().collection("products").where("active", "==", true).get());
+    await assertFails(anonymous().collection("products").get());
+    await assertSucceeds(admin().doc("products/hidden").get());
+    await assertSucceeds(admin().collection("products").get());
+  });
+
+  it("lets only admins write products, with valid prices", async () => {
+    await assertFails(customer().doc("products/new").set(product()));
+    await assertFails(customer().doc("products/lamp").update({ discountPricePaise: 1 }));
+    await assertFails(customer().doc("products/lamp").delete());
+    await assertSucceeds(admin().doc("products/new").set(product()));
+    const { couponPricePaise: _omit, ...noCoupon } = product();
+    await assertSucceeds(admin().doc("products/plain").set(noCoupon));
+    await assertFails(admin().doc("products/bad1").set(product({ discountPricePaise: 60_000 })));
+    await assertFails(admin().doc("products/bad2").set(product({ couponPricePaise: 45_000 })));
+    await assertFails(admin().doc("products/bad3").set(product({ originalPricePaise: 0 })));
+    await assertFails(admin().doc("products/bad4").set(product({ discountPricePaise: 400.5 })));
+    await assertFails(admin().doc("products/bad5").set(product({ name: "" })));
+    await assertFails(admin().doc("products/bad6").set(product({ imageUrl: "" })));
+    await assertSucceeds(admin().doc("products/lamp").delete());
+  });
+
+  it("keeps coupon codes away from customers", async () => {
+    await assertFails(anonymous().doc("productCoupons/lamp").get());
+    await assertFails(customer().doc("productCoupons/lamp").get());
+    await assertFails(customer().collection("productCoupons").get());
+    await assertFails(customer().doc("productCoupons/lamp").set({ code: "FREE" }));
+    await assertSucceeds(admin().doc("productCoupons/lamp").get());
+    await assertSucceeds(admin().doc("productCoupons/new").set({ code: "NEW-10" }));
+    await assertFails(admin().doc("productCoupons/new").set({ code: "X" }));
+    await assertSucceeds(admin().doc("productCoupons/lamp").delete());
   });
 });
 

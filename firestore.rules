@@ -173,6 +173,36 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    function validProduct(p) {
+      return p.name is string && p.name.size() >= 2 && p.name.size() <= 120
+        && p.imageUrl is string && p.imageUrl.size() > 0 && p.imageUrl.size() <= 2048
+        && p.originalPricePaise is int && p.originalPricePaise > 0
+        && p.discountPricePaise is int && p.discountPricePaise > 0
+        && p.discountPricePaise <= p.originalPricePaise
+        && (!('couponPricePaise' in p)
+            || (p.couponPricePaise is int && p.couponPricePaise > 0
+                && p.couponPricePaise <= p.discountPricePaise))
+        && p.active is bool && p.sortOrder is int;
+    }
+
+    // The shop catalogue: hidden products stay private to administrators.
+    // Public queries must therefore filter on `active == true`.
+    match /products/{productId} {
+      allow read: if isAdmin() || resource.data.active == true;
+      allow create, update: if isAdmin() && validProduct(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Coupon codes are a ticket-buyer perk handed out by `getProductCoupons`;
+    // no customer reads them directly.
+    match /productCoupons/{productId} {
+      allow read, delete: if isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.data.code is string
+        && request.resource.data.code.size() >= 3
+        && request.resource.data.code.size() <= 40;
+    }
+
     /* -------------------------------------------------------------- tickets */
 
     // The ticket grid is intentionally public so availability can be browsed

@@ -74,6 +74,10 @@ describe("public marketing assets", () => {
     await assertSucceeds(upload("admin1", "banners/new.png", png, image, { role: "admin" }));
     await assertSucceeds(upload("admin1", "payment-qr/qr.png", png, image, { role: "admin" }));
     await assertFails(upload("alice", "payment-qr/qr.png"));
+    await assertSucceeds(upload("admin1", "products/lamp.png", png, image, { role: "admin" }));
+    await assertSucceeds(storageFor(null).ref("products/lamp.png").getMetadata());
+    await assertFails(upload("alice", "products/evil.png"));
+    await assertFails(upload("admin1", "products/doc.pdf", png, { contentType: "application/pdf" }, { role: "admin" }));
   });
 
   it("keeps the co-hosted UWGEA folders public-read and UWGEA-admin-write", async () => {
