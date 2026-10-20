@@ -35,6 +35,14 @@ export function Dialog({
 }: DialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<Element | null>(null);
+  // Callers usually pass an inline `onClose`; reading it through a ref keeps the
+  // focus effect from re-running (and stealing focus) on every parent render.
+  const onCloseRef = useRef(onClose);
+  const dismissibleRef = useRef(dismissible);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+    dismissibleRef.current = dismissible;
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -49,7 +57,7 @@ export function Dialog({
     document.body.style.overflow = "hidden";
 
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && dismissible) onClose();
+      if (event.key === "Escape" && dismissibleRef.current) onCloseRef.current();
       if (event.key === "Tab" && panel) {
         const items = Array.from(
           panel.querySelectorAll<HTMLElement>(
@@ -74,7 +82,7 @@ export function Dialog({
       document.body.style.overflow = previousOverflow;
       (previouslyFocused.current as HTMLElement | null)?.focus?.();
     };
-  }, [open, onClose, dismissible]);
+  }, [open]);
 
   return (
     <AnimatePresence>
