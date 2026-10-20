@@ -33,6 +33,7 @@ import {
 } from "@/components/ui";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { CountdownTimer } from "@/features/draws/DrawMeta";
+import { ReferralLinkCard } from "@/features/referrals/ReferralLinkCard";
 import { formatINR } from "@/utils/money";
 import { formatDateTime, formatNumber, relativeTime } from "@/utils/format";
 
@@ -87,6 +88,8 @@ export function DashboardOverviewPage() {
 
   return (
     <>
+      <ReferralLinkCard className="mb-4 lg:hidden" />
+
       <PageHeader
         eyebrow="Your account"
         title={`Namaste, ${profile?.fullName?.split(" ")[0] ?? "participant"}`}

@@ -37,14 +37,8 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { formatINR, parseRupeesToPaise, paiseToRupees } from "@/utils/money";
 import { newId } from "@/utils/id";
 import type { LowBalanceState } from "@/pages/public/BookTicketsPage";
-import {
-  UPI_APPS,
-  appsForPlatform,
-  copyText,
-  detectPlatform,
-  upiLaunchUrl,
-  type UpiApp,
-} from "@/features/payments/upi";
+import { UPI_APPS, appsForPlatform, detectPlatform, upiLaunchUrl, type UpiApp } from "@/features/payments/upi";
+import { copyText } from "@/utils/clipboard";
 
 const PRESETS = [20000, 50000, 100000, 200000, 500000];
 
