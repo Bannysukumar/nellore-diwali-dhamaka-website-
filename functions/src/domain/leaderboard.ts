@@ -6,32 +6,47 @@ export interface LeaderboardRow {
   name: string;
   count: number;
   rank: number;
+  /** When the sponsor's latest counted referral joined, i.e. when they reached `count`. */
+  reachedAt: string;
 }
 
 /**
  * Ranks sponsors by how many people joined with their referral code. Rejected
  * referrals and sponsors whose account is missing or not active are left out.
- * Equal counts share a rank (1, 1, 3), and ties are listed alphabetically.
+ * Every sponsor gets a distinct rank: on equal counts, whoever reached that
+ * count first ranks higher.
  */
 export function buildReferralLeaderboard(
-  referrals: Array<Pick<Referral, "referrerUid" | "status">>,
+  referrals: Array<Pick<Referral, "referrerUid" | "status" | "createdAt">>,
   sponsors: Map<string, Pick<UserProfile, "fullName" | "status">>,
 ): LeaderboardRow[] {
-  const counts = new Map<string, number>();
+  const tally = new Map<string, { count: number; reachedAt: string }>();
   for (const referral of referrals) {
     if (referral.status === "rejected") continue;
-    counts.set(referral.referrerUid, (counts.get(referral.referrerUid) ?? 0) + 1);
+    const entry = tally.get(referral.referrerUid) ?? { count: 0, reachedAt: "" };
+    entry.count += 1;
+    const createdAt = referral.createdAt || "9999";
+    if (createdAt > entry.reachedAt) entry.reachedAt = createdAt;
+    tally.set(referral.referrerUid, entry);
   }
 
-  const rows = [...counts]
-    .flatMap(([uid, count]) => {
+  const rows = [...tally]
+    .flatMap(([uid, { count, reachedAt }]) => {
       const sponsor = sponsors.get(uid);
-      return sponsor?.status === "active" ? [{ uid, name: displayName(sponsor.fullName), count, rank: 0 }] : [];
+      return sponsor?.status === "active"
+        ? [{ uid, name: displayName(sponsor.fullName), count, reachedAt, rank: 0 }]
+        : [];
     })
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    .sort(
+      (a, b) =>
+        b.count - a.count ||
+        a.reachedAt.localeCompare(b.reachedAt) ||
+        a.name.localeCompare(b.name) ||
+        a.uid.localeCompare(b.uid),
+    );
 
   rows.forEach((row, i) => {
-    row.rank = i > 0 && rows[i - 1].count === row.count ? rows[i - 1].rank : i + 1;
+    row.rank = i + 1;
   });
   return rows;
 }

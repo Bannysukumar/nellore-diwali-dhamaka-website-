@@ -25,9 +25,9 @@ export interface ReferralLeaderboardResponse {
 }
 
 async function rebuild(): Promise<CachedLeaderboard> {
-  const referrals = (await db().collection(COLLECTIONS.referrals).select("referrerUid", "status").get()).docs.map(
-    (d) => d.data() as Pick<Referral, "referrerUid" | "status">,
-  );
+  const referrals = (
+    await db().collection(COLLECTIONS.referrals).select("referrerUid", "status", "createdAt").get()
+  ).docs.map((d) => d.data() as Pick<Referral, "referrerUid" | "status" | "createdAt">);
   const uids = [...new Set(referrals.map((r) => r.referrerUid))];
   const sponsors = new Map<string, Pick<UserProfile, "fullName" | "status">>();
   for (let i = 0; i < uids.length; i += 300) {

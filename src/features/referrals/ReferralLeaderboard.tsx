@@ -145,7 +145,8 @@ export function ReferralLeaderboard({ board }: { board: ReferralLeaderboardRespo
           ) : null}
           <p className="text-[11.5px] leading-relaxed text-muted">
             Counts every person who joined with the sponsor's code, except referrals rejected under the fair-use rules.
-            Names are shortened for privacy. Updated every minute.
+            When two sponsors have the same count, whoever reached it first ranks higher. Names are shortened for
+            privacy. Updated every minute.
           </p>
         </CardBody>
       </Card>
