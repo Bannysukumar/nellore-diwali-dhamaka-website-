@@ -1,4 +1,4 @@
-import { AlertCircle, Inbox, Loader2, RefreshCw, ShieldAlert } from "lucide-react";
+import { AlertCircle, CheckCircle2, Inbox, Loader2, RefreshCw, ShieldAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { describeStoreError } from "@/lib/backend/store";
 import { cn } from "@/utils/cn";
@@ -139,7 +139,7 @@ const ALERT_STYLES: Record<AlertTone, string> = {
 
 const ALERT_ICONS: Record<AlertTone, typeof AlertCircle> = {
   info: AlertCircle,
-  success: AlertCircle,
+  success: CheckCircle2,
   warning: ShieldAlert,
   danger: AlertCircle,
 };

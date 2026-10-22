@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from "react";
-import { CheckCircle2, KeyRound, Store } from "lucide-react";
+import { KeyRound, Store } from "lucide-react";
 import { useAsync } from "@/hooks/useAsync";
 import { useCollection } from "@/hooks/useCollection";
 import { useAuth } from "@/app/AuthProvider";
@@ -160,14 +160,9 @@ export function ShopDashboardPage() {
 
                 {last ? (
                   <Alert tone="success" className="mt-4" title={`Coupon ${last.couponId} marked as used`}>
-                    <span className="flex items-start gap-2">
-                      <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden />
-                      <span>
-                        {last.rewardName} for {last.customerName}
-                        {last.customerPhoneMasked ? ` (${last.customerPhoneMasked})` : ""} ·{" "}
-                        {formatDateTime(last.redeemedAt)}. Give the customer their reward.
-                      </span>
-                    </span>
+                    {last.rewardName} for {last.customerName}
+                    {last.customerPhoneMasked ? ` (${last.customerPhoneMasked})` : ""} ·{" "}
+                    {formatDateTime(last.redeemedAt)}. Give the customer their reward.
                   </Alert>
                 ) : null}
               </CardBody>

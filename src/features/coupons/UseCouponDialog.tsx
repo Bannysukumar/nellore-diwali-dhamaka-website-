@@ -10,6 +10,7 @@ function useCountdown(until: string | null): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!until) return;
+    setNow(Date.now());
     const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, [until]);
