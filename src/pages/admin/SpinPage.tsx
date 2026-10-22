@@ -182,11 +182,17 @@ export function AdminSpinPage() {
                 <dl className="grid gap-2 text-[13px]">
                   <Line label="Spins per qualified referral" value={String(config.data.spinsPerReferral)} />
                   <Line label="Maximum spins per account" value={String(config.data.maxSpinsPerUser)} />
-                  <Line label="Daily spin limit" value={String(config.data.dailySpinLimit)} />
+                  <Line label="Free spins per day" value={String(config.data.dailySpinLimit)} />
                   <Line
                     label="Price per paid spin"
                     value={config.data.spinPricePaise ? formatINR(config.data.spinPricePaise) : "Off (earned spins only)"}
                   />
+                  {config.data.spinPricePaise ? (
+                    <Line
+                      label="Paid spins per day"
+                      value={config.data.dailyPaidSpinLimit ? String(config.data.dailyPaidSpinLimit) : "Unlimited"}
+                    />
+                  ) : null}
                   <Line label="Maximum referral rewards" value={String(config.data.maxRewardsPerReferrer)} />
                   <Line label="Reward validity" value={`${config.data.rewardValidDays} days`} />
                   <Line label="Minimum age" value={`${config.data.minAge}+`} />

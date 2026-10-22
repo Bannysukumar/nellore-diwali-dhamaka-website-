@@ -68,7 +68,8 @@ export function rewardAvailable(reward: Reward | null | undefined): reward is Re
  *
  * With `payWithWallet: true` the spin is bought for the admin-set
  * `spinPricePaise` instead of consuming an earned spin; the debit commits in
- * the same transaction as the outcome.
+ * the same transaction as the outcome. `dailySpinLimit` caps earned spins only;
+ * paid spins have their own optional `dailyPaidSpinLimit`.
  */
 export const executeSpin = hotCallable(async (request): Promise<ExecuteSpinResponse> => {
   const user = await requireUser(request.auth);
@@ -162,12 +163,20 @@ export const executeSpin = hotCallable(async (request): Promise<ExecuteSpinRespo
     const spinsAfter = payWithWallet ? account.availableSpins : account.availableSpins - 1;
 
     const today = istDayKey(createdAt);
-    const usedToday = historySnap.docs.filter(
-      (d) => istDayKey((d.data() as SpinTransaction).createdAt) === today,
-    ).length;
-    if (usedToday >= config.dailySpinLimit) {
+    const spunToday = historySnap.docs
+      .map((d) => d.data() as SpinTransaction)
+      .filter((row) => istDayKey(row.createdAt) === today);
+    const paidToday = spunToday.filter((row) => (row.paidPaise ?? 0) > 0).length;
+    if (payWithWallet) {
+      const paidLimit = config.dailyPaidSpinLimit ?? 0;
+      if (paidLimit > 0 && paidToday >= paidLimit) {
+        resourceExhausted(
+          `You have reached the daily limit of ${paidLimit} paid spins. Come back tomorrow.`,
+        );
+      }
+    } else if (spunToday.length - paidToday >= config.dailySpinLimit) {
       resourceExhausted(
-        `You have reached the daily limit of ${config.dailySpinLimit} spins. Come back tomorrow.`,
+        `You have used the daily limit of ${config.dailySpinLimit} free spins. Your remaining free spins are kept for tomorrow.`,
       );
     }
 

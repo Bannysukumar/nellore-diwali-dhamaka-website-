@@ -88,6 +88,7 @@ interface CampaignDraft {
   referralClaimWindowHours: string;
   maxSpinsPerUser: string;
   dailySpinLimit: string;
+  dailyPaidSpinLimit: string;
   maxRewardsPerReferrer: string;
   maxReferralsPerAccount: string;
   rewardValidDays: string;
@@ -113,6 +114,7 @@ function toCampaignDraft(config: SpinConfig): CampaignDraft {
     referralClaimWindowHours: String(config.referralClaimWindowHours ?? 72),
     maxSpinsPerUser: String(config.maxSpinsPerUser),
     dailySpinLimit: String(config.dailySpinLimit),
+    dailyPaidSpinLimit: String(config.dailyPaidSpinLimit ?? 0),
     maxRewardsPerReferrer: String(config.maxRewardsPerReferrer),
     maxReferralsPerAccount: String(config.maxReferralsPerAccount),
     rewardValidDays: String(config.rewardValidDays),
@@ -327,7 +329,8 @@ export function AdminRewardsPage() {
         referralQualification: campaign.referralQualification,
         referralClaimWindowHours: whole(campaign.referralClaimWindowHours, "Referral claim window", 1),
         maxSpinsPerUser: whole(campaign.maxSpinsPerUser, "Maximum spins per account", 1),
-        dailySpinLimit: whole(campaign.dailySpinLimit, "Daily spin limit", 1),
+        dailySpinLimit: whole(campaign.dailySpinLimit, "Free spins per day", 1),
+        dailyPaidSpinLimit: whole(campaign.dailyPaidSpinLimit || "0", "Paid spins per day", 0),
         maxRewardsPerReferrer: whole(campaign.maxRewardsPerReferrer, "Maximum referral spins per referrer", 1),
         maxReferralsPerAccount: whole(campaign.maxReferralsPerAccount, "Maximum qualified referrals per referrer", 1),
         rewardValidDays: whole(campaign.rewardValidDays, "Reward validity", 1),
@@ -565,10 +568,11 @@ export function AdminRewardsPage() {
                     ["maxRewardsPerReferrer", "Max referral spins per referrer", "Lifetime total"],
                     ["referralClaimWindowHours", "Referral claim window", "Hours after signup"],
                     ["maxSpinsPerUser", "Max unused spins per account", ""],
-                    ["dailySpinLimit", "Spins allowed per day", ""],
+                    ["dailySpinLimit", "Free spins allowed per day", "Earned spins only"],
                     ["rewardValidDays", "Reward validity", "Days"],
                     ["minAge", "Minimum age", "Years"],
                     ["spinPriceRupees", "Price per paid spin (₹)", "0 = earned spins only"],
+                    ["dailyPaidSpinLimit", "Paid spins allowed per day", "0 = unlimited"],
                   ] as const
                 ).map(([key, label, hint]) => (
                   <div key={key}>

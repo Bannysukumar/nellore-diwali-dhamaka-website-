@@ -89,6 +89,7 @@ export function SpinPage() {
   }, [spinConfig]);
 
   const spinPricePaise = spinConfig?.spinPricePaise ?? 0;
+  const paidLimitLabel = spinConfig?.dailyPaidSpinLimit ? `${spinConfig.dailyPaidSpinLimit} a day` : "unlimited";
   const balancePaise = wallet.data?.balancePaise ?? 0;
   const wheelLive = Boolean(spinConfig?.enabled) && campaignOpen && !spinning;
   const canSpin = wheelLive && !readOnly && spinsLeft > 0;
@@ -192,9 +193,9 @@ export function SpinPage() {
         />
         <StatCard label="Spins used" value={spinAccount?.totalUsed ?? 0} hint="All time" />
         <StatCard
-          label="Daily limit"
+          label="Free spins per day"
           value={spinConfig?.dailySpinLimit ?? "—"}
-          hint="Resets each day"
+          hint={spinPricePaise > 0 ? `Paid spins: ${paidLimitLabel}` : "Resets each day"}
           tone="warning"
         />
       </div>
@@ -402,7 +403,8 @@ export function SpinPage() {
               <CardHeader title="Fair-use caps" />
               <CardBody className="space-y-1.5 text-[12.5px] text-muted">
                 <p>Maximum spins held: {spinConfig?.maxSpinsPerUser ?? "—"}</p>
-                <p>Daily spins allowed: {spinConfig?.dailySpinLimit ?? "—"}</p>
+                <p>Free spins allowed per day: {spinConfig?.dailySpinLimit ?? "—"}</p>
+                {spinPricePaise > 0 ? <p>Paid spins per day: {paidLimitLabel}</p> : null}
                 <p>Maximum referrals rewarded: {spinConfig?.maxReferralsPerAccount ?? "—"}</p>
               </CardBody>
             </Card>

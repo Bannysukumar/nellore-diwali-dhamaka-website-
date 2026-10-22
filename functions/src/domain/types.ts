@@ -274,7 +274,10 @@ export interface SpinConfig {
   /** A referral code can only be attached this many hours after account creation. */
   referralClaimWindowHours?: number;
   maxSpinsPerUser: number;
+  /** Earned (free) spins a customer may use per IST day. */
   dailySpinLimit: number;
+  /** Wallet-paid spins a customer may buy per IST day. 0 or absent: unlimited. */
+  dailyPaidSpinLimit?: number;
   maxRewardsPerReferrer: number;
   campaignStart?: ISODate;
   campaignEnd?: ISODate;

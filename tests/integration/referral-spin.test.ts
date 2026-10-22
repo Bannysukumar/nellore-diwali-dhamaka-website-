@@ -155,13 +155,42 @@ describe("referrals and the spin wheel", () => {
       expect((await walletOf(user.uid)).balancePaise).toBe(2_000);
       expect((await ledgerOf(user.uid)).filter((t) => t.type === "spin_purchase")).toHaveLength(1);
       expect((await walletOf(user.uid)).totalSpentPaise).toBe(2_000);
+    } finally {
+      await writeSpinConfig();
+    }
+  });
 
-      // Second paid spin hits the daily limit of 2 before the wallet is touched.
-      await call("executeSpin", { requestId: requestId("spin"), payWithWallet: true }, user.token);
-      expect(
-        await callError("executeSpin", { requestId: requestId("spin"), payWithWallet: true }, user.token),
-      ).toBe("RESOURCE_EXHAUSTED");
-      expect((await walletOf(user.uid)).balancePaise).toBe(1_000);
+  it("caps free spins per day but leaves paid spins unlimited unless a paid limit is set", async () => {
+    const user = await registerCustomer("Daily Paid Spinner");
+    await db.doc(`spinAccounts/${user.uid}`).set({ availableSpins: 5 }, { merge: true });
+    await db.doc(`walletAccounts/${user.uid}`).set({
+      uid: user.uid,
+      balancePaise: 100_000,
+      totalDepositedPaise: 100_000,
+      totalSpentPaise: 0,
+      pendingDepositPaise: 0,
+      updatedAt: new Date().toISOString(),
+    });
+    const spin = (payWithWallet: boolean) =>
+      call("executeSpin", { requestId: requestId("spin"), payWithWallet }, user.token);
+    const refused = (payWithWallet: boolean) =>
+      callError("executeSpin", { requestId: requestId("spin"), payWithWallet }, user.token);
+
+    await writeSpinConfig({ spinPricePaise: 2_000 });
+    try {
+      // The harness free limit is 2 a day; paid spins go past it.
+      for (let i = 0; i < 4; i += 1) await spin(true);
+      await spin(false);
+      await spin(false);
+      expect(await refused(false)).toBe("RESOURCE_EXHAUSTED");
+      expect(await spinsOf(user.uid)).toBe(3);
+      await spin(true);
+
+      await writeSpinConfig({ spinPricePaise: 2_000, dailyPaidSpinLimit: 5 });
+      const before = (await walletOf(user.uid)).balancePaise;
+      expect(await refused(true)).toBe("RESOURCE_EXHAUSTED");
+      expect((await walletOf(user.uid)).balancePaise).toBe(before);
+      expect((await ledgerOf(user.uid)).filter((t) => t.type === "spin_purchase")).toHaveLength(5);
     } finally {
       await writeSpinConfig();
     }
