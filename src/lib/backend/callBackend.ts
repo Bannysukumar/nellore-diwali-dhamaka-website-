@@ -87,6 +87,7 @@ export const BACKEND_FUNCTIONS = [
   "setCouponShop",
   "getCouponPin",
   "redeemCouponPin",
+  "getReferralLeaderboard",
 ] as const;
 
 export type BackendFunctionName = (typeof BACKEND_FUNCTIONS)[number];

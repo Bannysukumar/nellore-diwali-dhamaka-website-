@@ -20,6 +20,7 @@ export { setAdminClaim, logAdminAction, broadcastAnnouncement, startViewAs } fro
 export { adjustWallet } from "./wallet.js";
 export { findTransferRecipient, transferFunds } from "./transfers.js";
 export { getProductCoupons } from "./products.js";
+export { getReferralLeaderboard } from "./leaderboard.js";
 
 /* --------------------------------------------------------------- scheduled  */
 export {

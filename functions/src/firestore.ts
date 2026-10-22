@@ -79,6 +79,8 @@ export const COLLECTIONS = {
   products: "products",
   /** Coupon codes keyed by product id; admin-only in rules, handed out by `getProductCoupons`. */
   productCoupons: "productCoupons",
+  /** Cached public rankings, rebuilt by `getReferralLeaderboard`; server-only. */
+  leaderboards: "leaderboards",
 } as const;
 
 /** Firestore rejects `undefined`; strip it so optional fields stay optional. */

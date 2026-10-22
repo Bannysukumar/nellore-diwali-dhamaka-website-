@@ -59,6 +59,12 @@ const TicketDetailPage = lazy(() =>
 const ReferralsPage = lazy(() =>
   import("@/pages/dashboard/ReferralsPage").then((m) => ({ default: m.ReferralsPage })),
 );
+const DashboardLeaderboardPage = lazy(() =>
+  import("@/pages/dashboard/LeaderboardPage").then((m) => ({ default: m.DashboardLeaderboardPage })),
+);
+const LeaderboardPage = lazy(() =>
+  import("@/pages/public/LeaderboardPage").then((m) => ({ default: m.LeaderboardPage })),
+);
 const SpinPage = lazy(() =>
   import("@/pages/dashboard/SpinPage").then((m) => ({ default: m.SpinPage })),
 );
@@ -179,6 +185,7 @@ export function App() {
                   <Route path="draws" element={<DrawsPage />} />
                   <Route path="draws/:slug" element={<DrawDetailPage />} />
                   <Route path="winners" element={<WinnersPage />} />
+                  <Route path="leaderboard" element={<LeaderboardPage />} />
                   <Route path="products" element={<ProductsPage />} />
                   <Route path="book" element={<BookTicketsPage />} />
                   <Route path="about" element={<AboutPage />} />
@@ -202,6 +209,7 @@ export function App() {
                       <Route path="tickets" element={<MyTicketsPage />} />
                       <Route path="tickets/:ticketId" element={<TicketDetailPage />} />
                       <Route path="referrals" element={<ReferralsPage />} />
+                      <Route path="leaderboard" element={<DashboardLeaderboardPage />} />
                       <Route path="spin" element={<SpinPage />} />
                       <Route path="coupons" element={<CouponsPage />} />
                       <Route path="history" element={<DrawHistoryPage />} />

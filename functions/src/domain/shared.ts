@@ -67,7 +67,7 @@ export function displayName(fullName: string): string {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
   const first = parts[0] ?? "Participant";
   const initial = parts[1]?.charAt(0);
-  return initial ? `${first} ${initial}.` : `${first}.`;
+  return initial ? `${first} ${initial}.` : first;
 }
 
 /** Masks a UTR for wallet descriptions, e.g. `1234567890` -> `••••••7890`. */

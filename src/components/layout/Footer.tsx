@@ -7,6 +7,7 @@ const QUICK_LINKS = [
   { to: "/draws", label: "Upcoming draws" },
   { to: "/book", label: "Book tickets" },
   { to: "/winners", label: "Winners" },
+  { to: "/leaderboard", label: "Referral leaderboard" },
   { to: "/products", label: "Products" },
   { to: "/faqs", label: "FAQs" },
   { to: "/about", label: "About the event" },

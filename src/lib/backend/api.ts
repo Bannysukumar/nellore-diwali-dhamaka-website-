@@ -204,6 +204,25 @@ export interface RedeemCouponPinRequest {
 
 export type RedeemCouponPinResponse = CouponRedemption;
 
+/* ---------------------------------------------------------- leaderboard --- */
+
+export interface LeaderboardEntry {
+  rank: number;
+  /** Shortened for privacy, e.g. "Ravi K.". */
+  name: string;
+  count: number;
+  you?: boolean;
+}
+
+export interface ReferralLeaderboardResponse {
+  generatedAt: string;
+  totalReferrals: number;
+  totalSponsors: number;
+  entries: LeaderboardEntry[];
+  /** The caller's own standing; null when signed out. */
+  me: { rank: number | null; count: number } | null;
+}
+
 /* ----------------------------------------------------------------- draw --- */
 
 export interface RunDrawRequest {

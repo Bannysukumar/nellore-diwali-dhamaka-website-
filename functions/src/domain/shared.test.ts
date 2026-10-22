@@ -116,7 +116,7 @@ describe("displayName", () => {
   it("shortens to a first name plus initial — never a full legal name", () => {
     expect(displayName("Priya Sharma")).toBe("Priya S.");
     expect(displayName("Ravi Kumar Reddy")).toBe("Ravi K.");
-    expect(displayName("Madonna")).toBe("Madonna.");
+    expect(displayName("Madonna")).toBe("Madonna");
     expect(displayName("  Anil   Verma  ")).toBe("Anil V.");
   });
 });
