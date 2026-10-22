@@ -119,3 +119,45 @@ export function secureSample<T>(items: readonly T[], count: number): T[] {
   }
   return out;
 }
+
+/** Largest per-customer prize pack; bigger weight totals are scaled down to it. */
+export const MAX_DECK_SIZE = 1000;
+
+/** Identifies the wheel a prize pack was built from; any change to it rebuilds packs. */
+export function deckKey(segments: readonly { id: string; weight: number; active: boolean }[]): string {
+  return segments
+    .filter((s) => s.active && s.weight > 0)
+    .map((s) => `${s.id}:${s.weight}`)
+    .join("|");
+}
+
+/**
+ * A shuffled prize pack holding each active segment as many times as its
+ * weight, so weights 63/22/12/2/1 give exactly those counts in 100 cards.
+ * Fractional weights or totals above `MAX_DECK_SIZE` are scaled to fit, keeping
+ * at least one card per segment.
+ */
+export function buildDeck(segments: readonly { id: string; weight: number; active: boolean }[]): string[] {
+  const active = segments.filter((s) => s.active && s.weight > 0);
+  const total = active.reduce((sum, s) => sum + s.weight, 0);
+  const exact = total <= MAX_DECK_SIZE && active.every((s) => Number.isInteger(s.weight));
+  const cards: string[] = [];
+  for (const segment of active) {
+    const count = exact ? segment.weight : Math.max(1, Math.round((segment.weight / total) * MAX_DECK_SIZE));
+    for (let i = 0; i < count; i += 1) cards.push(segment.id);
+  }
+  for (let i = cards.length - 1; i > 0; i -= 1) {
+    const j = secureRandomInt(i + 1);
+    [cards[i], cards[j]] = [cards[j], cards[i]];
+  }
+  return cards;
+}
+
+const COUPON_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+/** Printed id for a won coupon, e.g. `CPN-7KQ2M9`. */
+export function newCouponId(): string {
+  let out = "CPN-";
+  for (let i = 0; i < 6; i += 1) out += COUPON_ALPHABET[secureRandomInt(COUPON_ALPHABET.length)];
+  return out;
+}

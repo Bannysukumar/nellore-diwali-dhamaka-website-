@@ -11,6 +11,7 @@ import {
   CardBody,
   CardHeader,
   DataTable,
+  Input,
   LoadErrors,
   ProgressBar,
   Segmented,
@@ -32,6 +33,7 @@ const REWARD_TONE: Record<RewardType, "gold" | "brand" | "emerald" | "warning" |
 
 export function AdminSpinPage() {
   const [filter, setFilter] = useState<"all" | "awarded" | "reversed">("all");
+  const [couponQuery, setCouponQuery] = useState("");
 
   const config = useAsync(() => rewardService.spinConfig(), []);
   const transactions = useAsync(() => rewardService.allSpinTransactions(400), []);
@@ -46,8 +48,10 @@ export function AdminSpinPage() {
 
   const filtered = useMemo(() => {
     const all = transactions.data ?? [];
-    return filter === "all" ? all : all.filter((t) => t.status === filter);
-  }, [transactions.data, filter]);
+    const byStatus = filter === "all" ? all : all.filter((t) => t.status === filter);
+    const query = couponQuery.trim().toUpperCase();
+    return query ? byStatus.filter((t) => t.couponId?.includes(query)) : byStatus;
+  }, [transactions.data, filter, couponQuery]);
 
   const stats = useMemo(() => {
     const all = transactions.data;
@@ -102,6 +106,9 @@ export function AdminSpinPage() {
         <div className="min-w-0">
           <p className="truncate text-ink">{row.rewardName}</p>
           <Badge tone={REWARD_TONE[row.rewardType]}>{row.rewardType.replace(/_/g, " ")}</Badge>
+          {row.couponId ? (
+            <p className="mt-0.5 font-mono text-[11px] font-semibold tracking-[0.06em] text-brand">{row.couponId}</p>
+          ) : null}
         </div>
       ),
     },
@@ -126,7 +133,7 @@ export function AdminSpinPage() {
         eyebrow="Draws & prizes"
         icon={Sparkles}
         title="Spin activity"
-        description="Every spin is decided server-side using a weighted, cryptographically secure draw. This page shows the outcomes and the current wheel configuration — it cannot force a result."
+        description="Every spin is decided server-side from the customer's own securely shuffled prize pack, built from the wheel weights. This page shows the outcomes and the current wheel configuration — it cannot force a result."
       />
 
       <LoadErrors className="mt-5" sources={[config, transactions, rewards, heldSpins, profiles]} />
@@ -278,7 +285,16 @@ export function AdminSpinPage() {
           onChange={setFilter}
           ariaLabel="Filter spin outcomes"
         />
-        <p className="text-[12px] text-muted">{formatNumber(filtered.length)} entries</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <Input
+            aria-label="Find a coupon by its id"
+            value={couponQuery}
+            onChange={(event) => setCouponQuery(event.target.value)}
+            placeholder="Find coupon id, e.g. CPN-7KQ2M9"
+            className="w-64"
+          />
+          <p className="text-[12px] text-muted">{formatNumber(filtered.length)} entries</p>
+        </div>
       </div>
 
       <Card className="mt-4">

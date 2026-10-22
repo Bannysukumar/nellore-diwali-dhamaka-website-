@@ -163,7 +163,7 @@ export function SpinPage() {
         eyebrow="Spin wheel"
         icon={Sparkles}
         title="Festival spin wheel"
-        description="Every spin is decided by the server using a cryptographically secure weighted selection. This page only reveals the result — it can never choose your prize."
+        description="Every spin is decided by the server from your own securely shuffled prize pack. This page only reveals the result — it can never choose your prize."
         crumbs={[
           { label: "Home", to: "/" },
           { label: "Dashboard", to: "/dashboard" },
@@ -253,6 +253,14 @@ export function SpinPage() {
                   {result.rewardExpiresAt ? (
                     <p className="mt-1 text-[12px] text-muted">
                       Valid until {formatDateTime(result.rewardExpiresAt)}
+                    </p>
+                  ) : null}
+                  {result.couponId ? (
+                    <p className="mt-2 text-[12.5px]">
+                      Coupon <strong className="tracking-[0.06em] text-ink">{result.couponId}</strong> ·{" "}
+                      <Link to="/dashboard/coupons" className="font-semibold text-brand hover:underline">
+                        View in Coupons
+                      </Link>
                     </p>
                   ) : null}
                 </div>

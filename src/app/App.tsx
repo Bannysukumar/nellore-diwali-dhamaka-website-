@@ -62,6 +62,9 @@ const ReferralsPage = lazy(() =>
 const SpinPage = lazy(() =>
   import("@/pages/dashboard/SpinPage").then((m) => ({ default: m.SpinPage })),
 );
+const CouponsPage = lazy(() =>
+  import("@/pages/dashboard/CouponsPage").then((m) => ({ default: m.CouponsPage })),
+);
 const DrawHistoryPage = lazy(() =>
   import("@/pages/dashboard/DrawHistoryPage").then((m) => ({ default: m.DrawHistoryPage })),
 );
@@ -197,6 +200,7 @@ export function App() {
                       <Route path="tickets/:ticketId" element={<TicketDetailPage />} />
                       <Route path="referrals" element={<ReferralsPage />} />
                       <Route path="spin" element={<SpinPage />} />
+                      <Route path="coupons" element={<CouponsPage />} />
                       <Route path="history" element={<DrawHistoryPage />} />
                       <Route path="notifications" element={<NotificationsPage />} />
                       <Route path="profile" element={<ProfilePage />} />

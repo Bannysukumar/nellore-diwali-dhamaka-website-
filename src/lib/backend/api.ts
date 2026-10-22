@@ -167,6 +167,8 @@ export interface ExecuteSpinResponse {
   rewardName: string;
   rewardType: RewardType;
   rewardExpiresAt?: string;
+  /** Printed id of a won coupon or gift; it is listed on the Coupons page. */
+  couponId?: string;
   walletCreditPaise: number;
   availableSpins: number;
   paidPaise: number;

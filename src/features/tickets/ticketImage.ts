@@ -40,7 +40,7 @@ export function dummyBars(seed: string) {
   return { bars, total: y };
 }
 
-const COLORS = {
+export const COLORS = {
   page: "#fff9ed",
   ivory: "#fff9ed",
   ivoryDim: "rgba(255, 249, 237, 0.62)",
@@ -59,17 +59,17 @@ const COLORS = {
   pendingSoft: "#fdf1d3",
 };
 
-const DISPLAY = "'Playfair Display', Georgia, serif";
-const SANS = "Inter, 'Segoe UI', Roboto, Arial, sans-serif";
+export const DISPLAY = "'Playfair Display', Georgia, serif";
+export const SANS = "Inter, 'Segoe UI', Roboto, Arial, sans-serif";
 
-const WIDTH = 720;
-const PAD = 24;
-const CARD_W = WIDTH - PAD * 2;
-const CARD_H = 300;
-const GAP = 24;
-const HEIGHT = PAD * 2 + CARD_H * 2 + GAP;
+export const WIDTH = 720;
+export const PAD = 24;
+export const CARD_W = WIDTH - PAD * 2;
+export const CARD_H = 300;
+export const GAP = 24;
+export const HEIGHT = PAD * 2 + CARD_H * 2 + GAP;
 
-function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+export function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.arcTo(x + w, y, x + w, y + h, r);
@@ -83,7 +83,7 @@ function setSpacing(ctx: CanvasRenderingContext2D, px: number) {
   if ("letterSpacing" in ctx) (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${px}px`;
 }
 
-function text(
+export function text(
   ctx: CanvasRenderingContext2D,
   value: string,
   x: number,
@@ -103,7 +103,7 @@ function text(
   setSpacing(ctx, 0);
 }
 
-function pill(ctx: CanvasRenderingContext2D, label: string, cx: number, cy: number, bg: string, fg: string) {
+export function pill(ctx: CanvasRenderingContext2D, label: string, cx: number, cy: number, bg: string, fg: string) {
   ctx.font = `800 15px ${SANS}`;
   setSpacing(ctx, 1);
   const w = ctx.measureText(label).width + 28;
@@ -113,7 +113,7 @@ function pill(ctx: CanvasRenderingContext2D, label: string, cx: number, cy: numb
   text(ctx, label, cx, cy + 5, { font: `800 15px ${SANS}`, color: fg, align: "center", spacing: 1 });
 }
 
-function perforation(ctx: CanvasRenderingContext2D, x: number, top: number, color: string) {
+export function perforation(ctx: CanvasRenderingContext2D, x: number, top: number, color: string) {
   ctx.save();
   ctx.strokeStyle = color;
   ctx.lineWidth = 2;
@@ -274,8 +274,8 @@ function drawBack(ctx: CanvasRenderingContext2D, ticket: Ticket) {
   for (const bar of bars) ctx.fillRect(bx + 12, by + 12 + bar.y * scale, bw - 24, bar.h * scale);
 }
 
-/** Renders both sides of a ticket into one PNG and downloads it. */
-export async function downloadTicketImage(ticket: Ticket, draw: Draw | null, holder: TicketHolder = {}) {
+/** Paints a two-card (front above back) image and downloads it as a PNG. */
+export async function downloadCardImage(filename: string, paint: (ctx: CanvasRenderingContext2D) => void) {
   try {
     await Promise.all([
       document.fonts.load(`800 28px ${DISPLAY}`),
@@ -297,17 +297,24 @@ export async function downloadTicketImage(ticket: Ticket, draw: Draw | null, hol
   ctx.fillStyle = COLORS.page;
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-  drawFront(ctx, ticket, draw, holder);
-  drawBack(ctx, ticket);
+  paint(ctx);
 
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-  if (!blob) throw new Error("The ticket image could not be created.");
+  if (!blob) throw new Error("The image could not be created.");
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `diwali-dhamaka-ticket-${ticket.numberLabel}.png`;
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+/** Renders both sides of a ticket into one PNG and downloads it. */
+export async function downloadTicketImage(ticket: Ticket, draw: Draw | null, holder: TicketHolder = {}) {
+  await downloadCardImage(`diwali-dhamaka-ticket-${ticket.numberLabel}.png`, (ctx) => {
+    drawFront(ctx, ticket, draw, holder);
+    drawBack(ctx, ticket);
+  });
 }

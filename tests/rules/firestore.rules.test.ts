@@ -197,6 +197,15 @@ describe("money and outcomes are server-only", () => {
     await assertFails(admin().doc("referrals/x_y").set({ status: "qualified" }));
   });
 
+  it("keeps a customer's upcoming spin results hidden, even from that customer", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc("spinDecks/alice").set({ uid: "alice", key: "k", cards: ["seg_a"] });
+    });
+    await assertFails(customer().doc("spinDecks/alice").get());
+    await assertFails(admin().doc("spinDecks/alice").get());
+    await assertFails(customer().doc("spinDecks/alice").set({ uid: "alice", key: "k", cards: [] }));
+  });
+
   it("only lets an owner query their own ledger", async () => {
     await assertSucceeds(customer().collection("walletTransactions").where("uid", "==", "alice").get());
     await assertFails(customer().collection("walletTransactions").get());

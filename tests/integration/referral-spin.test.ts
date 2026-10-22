@@ -196,6 +196,110 @@ describe("referrals and the spin wheel", () => {
     }
   });
 
+  describe("per-customer prize packs and coupons", () => {
+    const now = new Date().toISOString();
+    const reward = (id: string, fields: Record<string, unknown>) =>
+      db.doc(`rewards/${id}`).set({
+        id,
+        name: id,
+        description: `${id} reward`,
+        inventory: 0,
+        remaining: 0,
+        active: true,
+        createdAt: now,
+        updatedAt: now,
+        ...fields,
+      });
+    const segment = (id: string, rewardId: string, weight: number) => ({
+      id,
+      rewardId,
+      label: id,
+      color: "#000",
+      weight,
+      active: true,
+    });
+    const funded = async (name: string) => {
+      const user = await registerCustomer(name);
+      await db.doc(`walletAccounts/${user.uid}`).set({
+        uid: user.uid,
+        balancePaise: 100_000,
+        totalDepositedPaise: 100_000,
+        totalSpentPaise: 0,
+        pendingDepositPaise: 0,
+        updatedAt: now,
+      });
+      return user;
+    };
+    type Spun = { segmentId: string; couponId?: string; spinId: string };
+    const paidSpin = (token: string) =>
+      call<Spun>("executeSpin", { requestId: requestId("spin"), payWithWallet: true }, token);
+
+    beforeAll(async () => {
+      await reward("rw_none", { type: "no_prize", name: "Better luck next time" });
+      await reward("rw_coffee", {
+        type: "coupon",
+        name: "₹25 coffee",
+        inventory: 50,
+        remaining: 50,
+        couponLocation: "Shop 1, Main Road, Nellore",
+        couponLink: "https://maps.example/shop",
+        couponTerms: "Show this coupon at the counter.",
+      });
+      await reward("rw_sold_out", { type: "coupon", inventory: 5, remaining: 0 });
+    });
+
+    it("gives each customer exactly the configured share over one pack", async () => {
+      await writeSpinConfig({
+        spinPricePaise: 1_000,
+        segments: [segment("seg_credit", "rw_credit", 2), segment("seg_none", "rw_none", 3)],
+      });
+      try {
+        const user = await funded("Pack Spinner");
+        const results: string[] = [];
+        for (let i = 0; i < 5; i += 1) results.push((await paidSpin(user.token)).segmentId);
+        expect(results.filter((s) => s === "seg_credit")).toHaveLength(2);
+        expect(results.filter((s) => s === "seg_none")).toHaveLength(3);
+        expect((await db.doc(`spinDecks/${user.uid}`).get()).data()?.cards).toEqual([]);
+      } finally {
+        await writeSpinConfig();
+      }
+    });
+
+    it("skips a reward that is out of stock", async () => {
+      await writeSpinConfig({
+        spinPricePaise: 1_000,
+        segments: [segment("seg_gone", "rw_sold_out", 5), segment("seg_none", "rw_none", 1)],
+      });
+      try {
+        const user = await funded("Sold Out Spinner");
+        expect((await paidSpin(user.token)).segmentId).toBe("seg_none");
+        expect((await paidSpin(user.token)).segmentId).toBe("seg_none");
+      } finally {
+        await writeSpinConfig();
+      }
+    });
+
+    it("issues a coupon with its own id and the redemption details", async () => {
+      await writeSpinConfig({ spinPricePaise: 1_000, segments: [segment("seg_coffee", "rw_coffee", 1)] });
+      try {
+        const user = await funded("Coupon Winner");
+        const won = await paidSpin(user.token);
+        expect(won.couponId).toMatch(/^CPN-[A-Z2-9]{6}$/);
+        const row = (await db.doc(`spinTransactions/${won.spinId}`).get()).data();
+        expect(row).toMatchObject({
+          rewardType: "coupon",
+          couponId: won.couponId,
+          couponLocation: "Shop 1, Main Road, Nellore",
+          couponLink: "https://maps.example/shop",
+          couponTerms: "Show this coupon at the counter.",
+        });
+        expect((await db.doc("rewards/rw_coffee").get()).data()?.remaining).toBe(49);
+      } finally {
+        await writeSpinConfig();
+      }
+    });
+  });
+
   it("refuses a paid spin the wallet cannot cover and leaves nothing behind", async () => {
     const user = await registerCustomer("Short Wallet");
     await writeSpinConfig({ spinPricePaise: 5_000 });

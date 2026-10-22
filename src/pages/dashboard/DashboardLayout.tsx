@@ -11,6 +11,7 @@ import {
   ShoppingBag,
   Sparkles,
   Ticket,
+  TicketPercent,
   UserRound,
   Users,
   Wallet,
@@ -28,6 +29,7 @@ import { initials } from "@/utils/mask";
 
 const LINKS = [
   { to: "/dashboard/spin", label: "Spin wheel", icon: Sparkles, end: false },
+  { to: "/dashboard/coupons", label: "Coupons", icon: TicketPercent, end: false },
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard, end: true },
   { to: "/dashboard/wallet", label: "Wallet", icon: Wallet, end: false },
   { to: "/dashboard/send-money", label: "Send money", icon: Send, end: false },

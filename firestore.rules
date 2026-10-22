@@ -261,6 +261,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // A customer's upcoming wheel results. Reading it would reveal the next
+    // outcome, so only `executeSpin` (Admin SDK) touches it.
+    match /spinDecks/{userId} {
+      allow read, write: if false;
+    }
+
     match /spinTransactions/{spinId} {
       allow read: if isAdmin() || (signedIn() && uid() == resource.data.uid);
       allow write: if false;

@@ -243,6 +243,12 @@ export interface Reward {
   type: RewardType;
   valuePaise?: number;
   couponCode?: string;
+  /** Where a coupon or gift is redeemed: shop name and address. */
+  couponLocation?: string;
+  /** Map or website link for the redemption place (http/https only). */
+  couponLink?: string;
+  /** How to redeem, shown on the back of the coupon. */
+  couponTerms?: string;
   inventory: number;
   remaining: number;
   validDays?: number;
@@ -307,11 +313,31 @@ export interface SpinTransaction {
   rewardType: RewardType;
   rewardExpiresAt?: ISODate;
   couponCode?: string;
+  /** Unique id printed on a won coupon or gift, e.g. "CPN-7KQ2M9". */
+  couponId?: string;
+  /** Redemption details copied from the reward when it was won. */
+  rewardDescription?: string;
+  couponLocation?: string;
+  couponLink?: string;
+  couponTerms?: string;
   /** Set when the spin was paid from the wallet instead of using an earned spin. */
   paidPaise?: number;
   status: "awarded" | "reversed";
   requestId: string;
   createdAt: ISODate;
+}
+
+/**
+ * A customer's own shuffled pack of wheel results (server-only). Each spin
+ * takes the next card, so over one pack every customer receives exactly the
+ * configured share of each segment. `key` records the segments and weights the
+ * pack was built from; any wheel change rebuilds it.
+ */
+export interface SpinDeck {
+  uid: string;
+  key: string;
+  cards: string[];
+  updatedAt: ISODate;
 }
 
 export type WinnerStatus = "draft" | "published";

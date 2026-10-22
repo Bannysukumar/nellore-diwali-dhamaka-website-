@@ -10,7 +10,55 @@ import {
   secureRandomInt,
   weightedPick,
   prizeAssignmentOrder,
+  buildDeck,
+  deckKey,
+  newCouponId,
+  MAX_DECK_SIZE,
 } from "./shared.js";
+
+describe("per-customer prize packs", () => {
+  const wheel = [
+    { id: "none", weight: 63, active: true },
+    { id: "ten", weight: 22, active: true },
+    { id: "coffee", weight: 12, active: true },
+    { id: "hundred", weight: 2, active: true },
+    { id: "gift", weight: 1, active: true },
+    { id: "off", weight: 50, active: false },
+  ];
+  const tally = (cards: string[]) =>
+    cards.reduce<Record<string, number>>((acc, id) => ({ ...acc, [id]: (acc[id] ?? 0) + 1 }), {});
+
+  it("holds each active segment exactly as many times as its weight", () => {
+    const cards = buildDeck(wheel);
+    expect(cards).toHaveLength(100);
+    expect(tally(cards)).toEqual({ none: 63, ten: 22, coffee: 12, hundred: 2, gift: 1 });
+  });
+
+  it("shuffles each pack independently", () => {
+    const orders = new Set(Array.from({ length: 5 }, () => buildDeck(wheel).join(",")));
+    expect(orders.size).toBeGreaterThan(1);
+  });
+
+  it("scales large or fractional weights without dropping a segment", () => {
+    const cards = buildDeck([
+      { id: "big", weight: 5_000, active: true },
+      { id: "tiny", weight: 0.5, active: true },
+    ]);
+    expect(cards.length).toBeLessThanOrEqual(MAX_DECK_SIZE + 1);
+    expect(tally(cards).tiny).toBe(1);
+  });
+
+  it("changes key whenever a segment or weight changes", () => {
+    const key = deckKey(wheel);
+    expect(deckKey(wheel)).toBe(key);
+    expect(deckKey(wheel.map((s) => (s.id === "gift" ? { ...s, weight: 2 } : s)))).not.toBe(key);
+    expect(deckKey(wheel.map((s) => (s.id === "off" ? { ...s, active: true } : s)))).not.toBe(key);
+  });
+
+  it("prints coupon ids without look-alike characters", () => {
+    for (let i = 0; i < 50; i += 1) expect(newCouponId()).toMatch(/^CPN-[A-HJ-NP-Z2-9]{6}$/);
+  });
+});
 
 /**
  * These helpers decide what a participant sees and, in the case of the random

@@ -33,12 +33,24 @@ import { formatNumber } from "@/utils/format";
 import { newId } from "@/utils/id";
 
 const TYPE_LABEL: Record<RewardType, string> = {
-  coupon: "Coupon",
+  coupon: "Coupon (redeemed at a shop)",
+  wallet_credit: "Cash (credited to wallet)",
   gift: "Gift",
-  wallet_credit: "Wallet credit",
   free_ticket: "Free ticket",
   no_prize: "No prize",
 };
+
+/** Rewards the customer collects in person, so they appear on the Coupons page. */
+const isCouponType = (type: RewardType) => type !== "wallet_credit" && type !== "no_prize";
+
+function isWebLink(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
 
 const TYPE_TONE: Record<RewardType, "gold" | "brand" | "emerald" | "warning" | "muted"> = {
   coupon: "gold",
@@ -54,6 +66,9 @@ interface RewardDraft {
   type: RewardType;
   valueRupees: string;
   couponCode: string;
+  couponLocation: string;
+  couponLink: string;
+  couponTerms: string;
   inventory: string;
   validDays: string;
   active: boolean;
@@ -131,6 +146,9 @@ const EMPTY_REWARD: RewardDraft = {
   type: "coupon",
   valueRupees: "",
   couponCode: "",
+  couponLocation: "",
+  couponLink: "",
+  couponTerms: "",
   inventory: "100",
   validDays: "30",
   active: true,
@@ -183,6 +201,9 @@ export function AdminRewardsPage() {
       type: reward.type,
       valueRupees: reward.valuePaise ? (reward.valuePaise / 100).toString() : "",
       couponCode: reward.couponCode ?? "",
+      couponLocation: reward.couponLocation ?? "",
+      couponLink: reward.couponLink ?? "",
+      couponTerms: reward.couponTerms ?? "",
       inventory: String(reward.inventory),
       validDays: String(reward.validDays ?? 30),
       active: reward.active,
@@ -207,6 +228,22 @@ export function AdminRewardsPage() {
       }
     }
 
+    const coupon = isCouponType(draft.type);
+    const couponLocation = coupon ? draft.couponLocation.trim() : "";
+    const couponLink = coupon ? draft.couponLink.trim() : "";
+    const couponTerms = coupon ? draft.couponTerms.trim() : "";
+    if (coupon && !couponLocation && !couponLink) {
+      return setFormError("Tell winners where to redeem this coupon: add a location, a link, or both.");
+    }
+    if (couponLink && !isWebLink(couponLink)) {
+      return setFormError("The link must be a full web address starting with https://");
+    }
+    const couponFields = {
+      couponLocation: couponLocation || undefined,
+      couponLink: couponLink || undefined,
+      couponTerms: couponTerms || undefined,
+    };
+
     setSaving(true);
     try {
       const now = new Date().toISOString();
@@ -218,6 +255,7 @@ export function AdminRewardsPage() {
           type: draft.type,
           valuePaise,
           couponCode: draft.couponCode.trim() || undefined,
+          ...couponFields,
           inventory,
           remaining: Math.min(editing.remaining, inventory),
           validDays: Number(draft.validDays) || 30,
@@ -243,6 +281,7 @@ export function AdminRewardsPage() {
           type: draft.type,
           valuePaise,
           couponCode: draft.couponCode.trim() || undefined,
+          ...couponFields,
           inventory,
           remaining: inventory,
           validDays: Number(draft.validDays) || 30,
@@ -621,7 +660,7 @@ export function AdminRewardsPage() {
         <CardHeader
           icon={Sparkles}
           title="Wheel weighting"
-          description="Relative weights determine the probability of each segment. The server performs the weighted selection."
+          description="Each customer gets their own shuffled prize pack with every segment repeated by its weight. With weights totalling 100, a weight of 22 means exactly 22 of every 100 spins for each customer. Changing the wheel starts fresh packs."
           action={
             <div className="flex gap-2">
               <Button size="sm" variant="outline" onClick={addSegment} iconLeft={<Plus className="size-3.5" aria-hidden />}>
@@ -817,9 +856,59 @@ export function AdminRewardsPage() {
             </div>
           </FormRow>
 
+          {isCouponType(draft.type) ? (
+            <fieldset className="space-y-3 rounded-xl border border-gold/40 bg-gold-soft/20 p-3">
+              <legend className="px-1 text-[12px] font-bold uppercase tracking-[0.1em] text-gold-deep">
+                Where to redeem
+              </legend>
+              <p className="text-[12px] leading-relaxed text-muted">
+                Winners see this on the back of their coupon in the Coupons page. Add a location, a link, or both.
+              </p>
+              <div>
+                <Label htmlFor="reward-location" hint="Shop name and address">
+                  Location
+                </Label>
+                <Textarea
+                  id="reward-location"
+                  value={draft.couponLocation}
+                  onChange={(event) => setDraft({ ...draft, couponLocation: event.target.value })}
+                  className="min-h-16"
+                  maxLength={300}
+                  placeholder="e.g. Saagaz Coffee Express, Shop No 1, Ayyappagudi, Main Road, Nellore 524004"
+                />
+              </div>
+              <div>
+                <Label htmlFor="reward-link" hint="Google Maps or website, https://">
+                  Link
+                </Label>
+                <Input
+                  id="reward-link"
+                  type="url"
+                  inputMode="url"
+                  value={draft.couponLink}
+                  onChange={(event) => setDraft({ ...draft, couponLink: event.target.value })}
+                  placeholder="https://maps.app.goo.gl/…"
+                />
+              </div>
+              <div>
+                <Label htmlFor="reward-terms" hint="Optional">
+                  How to redeem
+                </Label>
+                <Textarea
+                  id="reward-terms"
+                  value={draft.couponTerms}
+                  onChange={(event) => setDraft({ ...draft, couponTerms: event.target.value })}
+                  className="min-h-16"
+                  maxLength={300}
+                  placeholder="e.g. Show this coupon at the counter. One coupon per visit."
+                />
+              </div>
+            </fieldset>
+          ) : null}
+
           <div>
-            <Label htmlFor="reward-inventory" required hint="Total units available">
-              Inventory
+            <Label htmlFor="reward-inventory" required hint="Total for all customers · 0 = unlimited">
+              Stock
             </Label>
             <Input
               id="reward-inventory"

@@ -22,10 +22,11 @@ import type {
   Reward,
   RewardType,
   SpinAccount,
+  SpinDeck,
   SpinTransaction,
   WheelSegment,
 } from "./domain/types.js";
-import { formatPaise, nowIso, weightedPick } from "./domain/shared.js";
+import { buildDeck, deckKey, formatPaise, newCouponId, nowIso } from "./domain/shared.js";
 
 export interface ExecuteSpinResponse {
   spinId: string;
@@ -34,6 +35,8 @@ export interface ExecuteSpinResponse {
   rewardName: string;
   rewardType: RewardType;
   rewardExpiresAt?: string;
+  /** Printed id of a won coupon or gift; it is listed on the Coupons page. */
+  couponId?: string;
   walletCreditPaise: number;
   availableSpins: number;
   /** Amount debited from the wallet for this spin; 0 when an earned spin was used. */
@@ -59,9 +62,10 @@ export function rewardAvailable(reward: Reward | null | undefined): reward is Re
 /**
  * Plays one spin on the reward wheel.
  *
- * The outcome is chosen here, on the server, with a cryptographically secure
- * weighted draw over the segments whose reward is active and in stock — the
- * browser only animates the result it is told. Spin consumption, stock
+ * The outcome is chosen here, on the server: it is the next card in the
+ * customer's own securely shuffled prize pack (see `SpinDeck`), skipping cards
+ * whose reward is inactive or out of stock — the browser only animates the
+ * result it is told. Spin consumption, stock
  * decrement and any wallet credit commit in one transaction, and the spin
  * document id is derived from the caller's `requestId`, so a retried request
  * returns the original outcome instead of spinning again.
@@ -96,6 +100,7 @@ export const executeSpin = hotCallable(async (request): Promise<ExecuteSpinRespo
       rewardName: row.rewardName,
       rewardType: row.rewardType,
       rewardExpiresAt: row.rewardExpiresAt,
+      couponId: row.couponId,
       walletCreditPaise: 0,
       availableSpins: account?.availableSpins ?? 0,
       paidPaise: row.paidPaise ?? 0,
@@ -111,7 +116,7 @@ export const executeSpin = hotCallable(async (request): Promise<ExecuteSpinRespo
   }
   await enforceRateLimit(user.uid, "executeSpin", { max: 10, windowSeconds: 60 });
 
-  // ---- choose the outcome once, outside the transaction --------------------
+  // ---- segments whose reward can be won right now -------------------------
   const candidates = config.segments.filter((s) => s.active && s.weight > 0);
   const rewardSnaps = await Promise.all(
     Array.from(new Set(candidates.map((s) => s.rewardId))).map((id) =>
@@ -122,26 +127,21 @@ export const executeSpin = hotCallable(async (request): Promise<ExecuteSpinRespo
   for (const snap of rewardSnaps) {
     if (snap.exists) rewards.set(snap.id, { ...(snap.data() as Reward), id: snap.id });
   }
-  const eligible: WheelSegment[] = candidates.filter((s) => rewardAvailable(rewards.get(s.rewardId)));
-  if (!eligible.length) failedPrecondition("The wheel has no rewards available right now.");
-  const chosen = weightedPick(eligible);
-  const reward = rewards.get(chosen.rewardId) as Reward;
-
+  const eligible = new Map<string, WheelSegment>(
+    candidates.filter((s) => rewardAvailable(rewards.get(s.rewardId))).map((s) => [s.id, s]),
+  );
+  if (!eligible.size) failedPrecondition("The wheel has no rewards available right now.");
+  const packKey = deckKey(config.segments);
   const createdAt = nowIso();
-  const validDays = reward.validDays ?? config.rewardValidDays;
-  const rewardExpiresAt =
-    reward.type !== "no_prize" && validDays > 0
-      ? new Date(Date.now() + validDays * 86_400_000).toISOString()
-      : undefined;
 
   const runSpin = () => db().runTransaction(async (tx) => {
     // ---- read phase -------------------------------------------------------
     const accountRef = db().collection(COLLECTIONS.spinAccounts).doc(user.uid);
-    const rewardRef = db().collection(COLLECTIONS.rewards).doc(reward.id);
-    const [existingSpin, accountSnap, rewardSnap, historySnap] = await Promise.all([
+    const deckRef = db().collection(COLLECTIONS.spinDecks).doc(user.uid);
+    const [existingSpin, accountSnap, deckSnap, historySnap] = await Promise.all([
       tx.get(spinRef),
       tx.get(accountRef),
-      tx.get(rewardRef),
+      tx.get(deckRef),
       tx.get(
         db()
           .collection(COLLECTIONS.spinTransactions)
@@ -149,8 +149,30 @@ export const executeSpin = hotCallable(async (request): Promise<ExecuteSpinRespo
           .where("createdAt", ">=", istDayStartIso(createdAt)),
       ),
     ]);
+
+    // The next card in this customer's pack decides the outcome. Cards whose
+    // reward is out of stock or switched off are discarded.
+    const stored = deckSnap.exists ? (deckSnap.data() as SpinDeck) : null;
+    let cards = stored?.key === packKey ? [...stored.cards] : [];
+    let rebuilt = false;
+    let chosen: WheelSegment | undefined;
+    while (!chosen) {
+      if (!cards.length) {
+        if (rebuilt) failedPrecondition("The wheel has no rewards available right now.");
+        cards = buildDeck(candidates);
+        rebuilt = true;
+      }
+      chosen = eligible.get(cards.shift() as string);
+    }
+
+    const rewardRef = db().collection(COLLECTIONS.rewards).doc(chosen.rewardId);
+    const rewardSnap = await tx.get(rewardRef);
+    const liveReward = rewardSnap.exists ? ({ ...(rewardSnap.data() as Reward), id: rewardSnap.id }) : null;
+    if (!rewardAvailable(liveReward)) {
+      aborted("The reward stock changed while spinning. Please spin again — no spin was used.");
+    }
     const wallet =
-      payWithWallet || reward.type === "wallet_credit" ? await readWallet(tx, user.uid) : null;
+      payWithWallet || liveReward.type === "wallet_credit" ? await readWallet(tx, user.uid) : null;
 
     if (existingSpin.exists) aborted("This spin is already being processed. Please refresh.");
 
@@ -180,10 +202,12 @@ export const executeSpin = hotCallable(async (request): Promise<ExecuteSpinRespo
       );
     }
 
-    const liveReward = rewardSnap.exists ? ({ ...(rewardSnap.data() as Reward), id: rewardSnap.id }) : null;
-    if (!rewardAvailable(liveReward) || liveReward.type !== reward.type) {
-      aborted("The reward stock changed while spinning. Please spin again — no spin was used.");
-    }
+    const validDays = liveReward.validDays ?? config.rewardValidDays;
+    const rewardExpiresAt =
+      liveReward.type !== "no_prize" && validDays > 0
+        ? new Date(Date.parse(createdAt) + validDays * 86_400_000).toISOString()
+        : undefined;
+    const isCoupon = liveReward.type !== "wallet_credit" && liveReward.type !== "no_prize";
 
     // ---- write phase ------------------------------------------------------
     const spin: SpinTransaction = clean({
@@ -194,7 +218,12 @@ export const executeSpin = hotCallable(async (request): Promise<ExecuteSpinRespo
       rewardName: liveReward.name,
       rewardType: liveReward.type,
       rewardExpiresAt,
-      couponCode: liveReward.type === "coupon" ? liveReward.couponCode : undefined,
+      couponCode: isCoupon ? liveReward.couponCode : undefined,
+      couponId: isCoupon ? newCouponId() : undefined,
+      rewardDescription: isCoupon ? liveReward.description : undefined,
+      couponLocation: isCoupon ? liveReward.couponLocation : undefined,
+      couponLink: isCoupon ? liveReward.couponLink : undefined,
+      couponTerms: isCoupon ? liveReward.couponTerms : undefined,
       paidPaise: payWithWallet ? pricePaise : undefined,
       status: "awarded" as const,
       requestId,
@@ -246,7 +275,12 @@ export const executeSpin = hotCallable(async (request): Promise<ExecuteSpinRespo
       walletCreditPaise = liveReward.valuePaise;
     }
 
+    const deck: SpinDeck = { uid: user.uid, key: packKey, cards, updatedAt: createdAt };
+    tx.set(deckRef, deck);
+
     return {
+      spin,
+      reward: liveReward,
       walletCreditPaise,
       availableSpins: spinsAfter,
       balancePaise: wallet ? wallet.account.balancePaise : undefined,
@@ -265,23 +299,27 @@ export const executeSpin = hotCallable(async (request): Promise<ExecuteSpinRespo
     throw error;
   }
 
+  const { spin, reward } = result;
   await notify(
     user.uid,
     "spin_awarded",
     "Spin result",
     reward.type === "no_prize"
       ? "Better luck next time — thanks for playing."
-      : `You won: ${reward.name}.${rewardExpiresAt ? " Check the rewards section for validity." : ""}`,
-    "/dashboard/spin",
+      : spin.couponId
+        ? `You won: ${reward.name}. Coupon ${spin.couponId} is saved in your Coupons page.`
+        : `You won: ${reward.name}.`,
+    spin.couponId ? "/dashboard/coupons" : "/dashboard/spin",
   );
 
   return {
     spinId: spinRef.id,
-    segmentId: chosen.id,
+    segmentId: spin.segmentId,
     rewardId: reward.id,
     rewardName: reward.name,
     rewardType: reward.type,
-    rewardExpiresAt,
+    rewardExpiresAt: spin.rewardExpiresAt,
+    couponId: spin.couponId,
     walletCreditPaise: result.walletCreditPaise,
     availableSpins: result.availableSpins,
     paidPaise: payWithWallet ? pricePaise : 0,

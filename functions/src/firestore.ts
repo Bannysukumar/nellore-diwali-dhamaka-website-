@@ -60,6 +60,7 @@ export const COLLECTIONS = {
   referrals: "referrals",
   rewards: "rewards",
   spinAccounts: "spinAccounts",
+  spinDecks: "spinDecks",
   spinTransactions: "spinTransactions",
   drawResults: "drawResults",
   winnerAnnouncements: "winnerAnnouncements",
