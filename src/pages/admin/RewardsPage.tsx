@@ -476,7 +476,7 @@ export function AdminRewardsPage() {
       align: "right",
       render: (row) => (
         <span className="tabular-nums text-ink">
-          {formatNumber(row.remaining)} / {formatNumber(row.inventory)}
+          {row.inventory > 0 ? `${formatNumber(row.remaining)} / ${formatNumber(row.inventory)}` : "Unlimited"}
         </span>
       ),
     },
