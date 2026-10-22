@@ -170,7 +170,13 @@ export const redeemCouponPin = onCall<unknown>(CALLABLE_OPTIONS, async (request)
   const live = matches.docs.find((d) => Date.parse((d.data() as CouponPin).expiresAt) > now);
   if (!live) notFound("That PIN is wrong or has expired. Ask the customer to tap “Use coupon” again.");
   const pinRow = live.data() as CouponPin;
-  if (!shop.rewardIds.includes(pinRow.rewardId)) permissionDenied("This coupon is not for your shop.");
+  if (!shop.rewardIds.includes(pinRow.rewardId)) {
+    const reward = await readDoc<Reward>(COLLECTIONS.rewards, pinRow.rewardId);
+    permissionDenied(
+      `This PIN is for a “${reward?.name ?? "different"}” coupon, which ${shop.shopName} is not set up to accept. ` +
+        "The coupon has not been used. Send the customer to the right shop, or ask the organiser to add this coupon to your shop.",
+    );
+  }
 
   const customer = await readDoc<UserProfile>(COLLECTIONS.users, pinRow.uid);
   const spinRef = db().collection(COLLECTIONS.spinTransactions).doc(pinRow.spinId);
