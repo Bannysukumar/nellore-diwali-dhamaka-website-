@@ -65,6 +65,9 @@ const SpinPage = lazy(() =>
 const CouponsPage = lazy(() =>
   import("@/pages/dashboard/CouponsPage").then((m) => ({ default: m.CouponsPage })),
 );
+const ShopDashboardPage = lazy(() =>
+  import("@/pages/shop/ShopDashboardPage").then((m) => ({ default: m.ShopDashboardPage })),
+);
 const DrawHistoryPage = lazy(() =>
   import("@/pages/dashboard/DrawHistoryPage").then((m) => ({ default: m.DrawHistoryPage })),
 );
@@ -206,6 +209,7 @@ export function App() {
                       <Route path="profile" element={<ProfilePage />} />
                       <Route path="support" element={<SupportPage />} />
                     </Route>
+                    <Route path="shop" element={<ShopDashboardPage />} />
                   </Route>
                 </Route>
 

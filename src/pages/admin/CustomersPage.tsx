@@ -54,6 +54,7 @@ import {
   type Column,
 } from "@/components/ui";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { CouponShopAccess } from "@/features/coupons/CouponShopAccess";
 import { formatINR, parseRupeesToPaise } from "@/utils/money";
 import { formatDate, formatDateTime, formatNumber } from "@/utils/format";
 import { initials } from "@/utils/mask";
@@ -752,6 +753,8 @@ export function AdminCustomersPage() {
                 <p className="mt-2 text-[12px] text-muted">Reactivate the account before giving it admin access.</p>
               ) : null}
             </div>
+
+            <CouponShopAccess user={selected} />
           </div>
         ) : null}
       </Dialog>

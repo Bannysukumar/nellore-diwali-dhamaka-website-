@@ -10,6 +10,7 @@ import {
   Send,
   ShoppingBag,
   Sparkles,
+  Store,
   Ticket,
   TicketPercent,
   UserRound,
@@ -19,6 +20,7 @@ import {
 import { useAuth } from "@/app/AuthProvider";
 import { useSiteSettings } from "@/app/SettingsProvider";
 import { walletService } from "@/services/walletService";
+import { couponService } from "@/services/couponService";
 import { useAsync } from "@/hooks/useAsync";
 import { useCollection } from "@/hooks/useCollection";
 import type { AppNotification } from "@/types";
@@ -42,6 +44,8 @@ const LINKS = [
   { to: "/dashboard/support", label: "Support", icon: LifeBuoy, end: false },
 ];
 
+const SHOP_LINK = { to: "/shop", label: "Shop dashboard", icon: Store, end: false };
+
 export function DashboardLayout() {
   const { profile, uid } = useAuth();
   const settings = useSiteSettings();
@@ -52,6 +56,8 @@ export function DashboardLayout() {
     [uid, location.pathname],
     { enabled: Boolean(uid) },
   );
+  const shop = useAsync(async () => (uid ? await couponService.shop(uid) : null), [uid], { enabled: Boolean(uid) });
+  const links = shop.data?.active ? [SHOP_LINK, ...LINKS] : LINKS;
 
   const notifications = useCollection<AppNotification>("notifications", {
     where: [{ field: "uid", op: "==", value: uid ?? "" }],
@@ -125,7 +131,7 @@ export function DashboardLayout() {
             ref={strip}
             className="no-scrollbar relative flex gap-1.5 overflow-x-auto overscroll-x-contain rounded-[var(--radius-card)] border border-line bg-paper p-2 lg:flex-col lg:gap-1 lg:overflow-visible"
           >
-            {LINKS.map((item) => (
+            {links.map((item) => (
               <li key={item.to} className="shrink-0 lg:shrink">
                 <NavLink
                   to={item.to}

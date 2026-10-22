@@ -14,6 +14,7 @@ export { pickPaymentQr, submitDeposit, reviewDeposit } from "./deposits.js";
 export { purchaseTickets, generateTicketInventory } from "./tickets.js";
 export { claimReferral, qualifyReferral, moderateReferral } from "./referrals.js";
 export { executeSpin } from "./spin.js";
+export { setCouponShop, getCouponPin, redeemCouponPin } from "./coupons.js";
 export { runDraw, publishDrawResults, cancelDraw, moderateWinner } from "./draws.js";
 export { setAdminClaim, logAdminAction, broadcastAnnouncement, startViewAs } from "./admin.js";
 export { adjustWallet } from "./wallet.js";

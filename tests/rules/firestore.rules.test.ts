@@ -206,6 +206,32 @@ describe("money and outcomes are server-only", () => {
     await assertFails(customer().doc("spinDecks/alice").set({ uid: "alice", key: "k", cards: [] }));
   });
 
+  it("keeps coupon PINs server-only and shows receipts only to the shop, the customer and admins", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc("couponPins/s1").set({ spinId: "s1", uid: "alice", pin: "123456" });
+      await ctx.firestore().doc("couponShops/shopper").set({ uid: "shopper", shopName: "Cafe", rewardIds: ["r"], active: true });
+      await ctx
+        .firestore()
+        .doc("couponRedemptions/s1")
+        .set({ spinId: "s1", customerUid: "alice", shopUid: "shopper", redeemedAt: "2026-10-22T00:00:00Z" });
+    });
+    const shopper = env.authenticatedContext("shopper").firestore();
+    await assertFails(customer().doc("couponPins/s1").get());
+    await assertFails(shopper.doc("couponPins/s1").get());
+    await assertFails(admin().doc("couponPins/s1").get());
+
+    await assertSucceeds(shopper.doc("couponShops/shopper").get());
+    await assertFails(customer().doc("couponShops/shopper").get());
+    await assertFails(shopper.doc("couponShops/shopper").set({ uid: "shopper", rewardIds: ["any"], active: true }));
+    await assertFails(customer().doc("couponShops/alice").set({ uid: "alice", rewardIds: ["r"], active: true }));
+
+    await assertSucceeds(shopper.doc("couponRedemptions/s1").get());
+    await assertSucceeds(customer().doc("couponRedemptions/s1").get());
+    await assertFails(otherCustomer().doc("couponRedemptions/s1").get());
+    await assertSucceeds(shopper.collection("couponRedemptions").where("shopUid", "==", "shopper").get());
+    await assertFails(shopper.doc("couponRedemptions/s2").set({ shopUid: "shopper", customerUid: "alice" }));
+  });
+
   it("only lets an owner query their own ledger", async () => {
     await assertSucceeds(customer().collection("walletTransactions").where("uid", "==", "alice").get());
     await assertFails(customer().collection("walletTransactions").get());

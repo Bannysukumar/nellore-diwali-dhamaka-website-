@@ -267,6 +267,24 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Coupon shop owners: written only by the admin-only `setCouponShop`.
+    match /couponShops/{userId} {
+      allow read: if isAdmin() || (signedIn() && uid() == userId);
+      allow write: if false;
+    }
+
+    // Live coupon PINs would let anyone use another customer's coupon.
+    match /couponPins/{spinId} {
+      allow read, write: if false;
+    }
+
+    // Receipts written by `redeemCouponPin`.
+    match /couponRedemptions/{spinId} {
+      allow read: if isAdmin()
+        || (signedIn() && (uid() == resource.data.shopUid || uid() == resource.data.customerUid));
+      allow write: if false;
+    }
+
     match /spinTransactions/{spinId} {
       allow read: if isAdmin() || (signedIn() && uid() == resource.data.uid);
       allow write: if false;

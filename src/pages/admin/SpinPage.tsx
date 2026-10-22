@@ -109,6 +109,11 @@ export function AdminSpinPage() {
           {row.couponId ? (
             <p className="mt-0.5 font-mono text-[11px] font-semibold tracking-[0.06em] text-brand">{row.couponId}</p>
           ) : null}
+          {row.redeemedAt ? (
+            <p className="text-[11px] text-muted">
+              Used{row.redeemedShop ? ` at ${row.redeemedShop}` : ""} · {formatDateTime(row.redeemedAt)}
+            </p>
+          ) : null}
         </div>
       ),
     },

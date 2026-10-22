@@ -17,7 +17,7 @@ import {
   text,
   type TicketHolder,
 } from "@/features/tickets/ticketImage";
-import { shortLink, type CouponView } from "./coupon";
+import { couponState, shortLink, type CouponView } from "./coupon";
 
 function wrapLines(ctx: CanvasRenderingContext2D, value: string, font: string, maxWidth: number, maxLines: number) {
   ctx.font = font;
@@ -92,9 +92,16 @@ function drawFront(ctx: CanvasRenderingContext2D, coupon: CouponView, holder: Ti
 
   perforation(ctx, perfX, y, "rgba(255, 249, 237, 0.35)");
   const cx = perfX + stubW / 2;
-  if (coupon.expired) pill(ctx, "EXPIRED", cx, y + 120, COLORS.pendingSoft, COLORS.pending);
+  const state = couponState(coupon);
+  if (state === "used") pill(ctx, "USED", cx, y + 120, COLORS.ivory, COLORS.muted);
+  else if (state === "expired") pill(ctx, "EXPIRED", cx, y + 120, COLORS.pendingSoft, COLORS.pending);
   else pill(ctx, "VALID", cx, y + 120, COLORS.emeraldSoft, COLORS.emerald);
-  text(ctx, "Show at the shop", cx, y + 172, { font: `600 15px ${SANS}`, color: COLORS.ivoryDim, align: "center" });
+  text(ctx, state === "used" ? `at ${coupon.usedShop ?? "the shop"}` : "Show at the shop", cx, y + 172, {
+    font: `600 15px ${SANS}`,
+    color: COLORS.ivoryDim,
+    align: "center",
+    maxWidth: stubW - 20,
+  });
 }
 
 function drawBack(ctx: CanvasRenderingContext2D, coupon: CouponView) {

@@ -84,6 +84,9 @@ export const BACKEND_FUNCTIONS = [
   "findTransferRecipient",
   "transferFunds",
   "getProductCoupons",
+  "setCouponShop",
+  "getCouponPin",
+  "redeemCouponPin",
 ] as const;
 
 export type BackendFunctionName = (typeof BACKEND_FUNCTIONS)[number];

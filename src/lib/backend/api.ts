@@ -1,4 +1,4 @@
-import type { DepositStatus, RewardType, UserRole } from "@/types";
+import type { CouponRedemption, DepositStatus, RewardType, UserRole } from "@/types";
 
 /**
  * Request/response contract of the Cloud Functions callables. Mirrors
@@ -174,6 +174,35 @@ export interface ExecuteSpinResponse {
   paidPaise: number;
   balancePaise?: number;
 }
+
+/* -------------------------------------------------------------- coupons --- */
+
+export interface SetCouponShopRequest {
+  uid: string;
+  active: boolean;
+  shopName?: string;
+  rewardIds?: string[];
+}
+
+export interface SetCouponShopResponse {
+  uid: string;
+  active: boolean;
+}
+
+export interface GetCouponPinRequest {
+  spinId: string;
+}
+
+export interface GetCouponPinResponse {
+  pin: string;
+  expiresAt: string;
+}
+
+export interface RedeemCouponPinRequest {
+  pin: string;
+}
+
+export type RedeemCouponPinResponse = CouponRedemption;
 
 /* ----------------------------------------------------------------- draw --- */
 

@@ -347,11 +347,40 @@ export interface SpinTransaction {
   couponLocation?: string;
   couponLink?: string;
   couponTerms?: string;
+  /** Set once a coupon shop owner confirms the customer's coupon PIN. */
+  redeemedAt?: ISODate;
+  redeemedByUid?: string;
+  redeemedShop?: string;
   /** Set when the spin was paid from the wallet instead of using an earned spin. */
   paidPaise?: number;
   status: "awarded" | "reversed";
   requestId: string;
   createdAt: ISODate;
+}
+
+/** A customer account an administrator allowed to redeem certain coupon rewards. */
+export interface CouponShop {
+  uid: string;
+  shopName: string;
+  rewardIds: string[];
+  active: boolean;
+  assignedByUid: string;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+}
+
+/** Receipt of a used coupon, visible to the shop, the customer and admins. */
+export interface CouponRedemption {
+  spinId: string;
+  couponId: string;
+  rewardId: string;
+  rewardName: string;
+  customerUid: string;
+  customerName: string;
+  customerPhoneMasked: string;
+  shopUid: string;
+  shopName: string;
+  redeemedAt: ISODate;
 }
 
 /* --------------------------------------------------------------------------

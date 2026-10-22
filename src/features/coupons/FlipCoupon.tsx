@@ -5,10 +5,16 @@ import { Button } from "@/components/ui";
 import { cn } from "@/utils/cn";
 import { formatDateTime } from "@/utils/format";
 import { SITE_HOST, dummyBars, formatMobile } from "@/features/tickets/ticketImage";
-import { shortLink, type CouponView } from "./coupon";
+import { couponState, shortLink, type CouponState, type CouponView } from "./coupon";
 import { downloadCouponImage } from "./couponImage";
 
 const notch = "absolute size-5 rounded-full bg-paper";
+
+const STATE_BADGE: Record<CouponState, string> = {
+  valid: "bg-emerald-soft text-emerald",
+  used: "bg-ivory/90 text-muted",
+  expired: "bg-status-pending-bg text-status-pending",
+};
 
 function DummyBarcode({ seed }: { seed: string }) {
   const { bars, total } = useMemo(() => dummyBars(seed), [seed]);
@@ -67,6 +73,7 @@ export function FlipCoupon({
   holderPhone?: string;
 }) {
   const [flipped, setFlipped] = useState(false);
+  const state = couponState(coupon);
 
   return (
     <button
@@ -121,11 +128,14 @@ export function FlipCoupon({
             <span
               className={cn(
                 "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.06em]",
-                coupon.expired ? "bg-status-pending-bg text-status-pending" : "bg-emerald-soft text-emerald",
+                STATE_BADGE[state],
               )}
             >
-              {coupon.expired ? "Expired" : "Valid"}
+              {state}
             </span>
+            {coupon.usedAt ? (
+              <span className="text-[10px] leading-tight text-ivory/80">{formatDateTime(coupon.usedAt)}</span>
+            ) : null}
             <span className="mt-1 flex flex-col items-center gap-1 text-[10.5px] font-semibold leading-tight text-ivory/80">
               <RotateCw className="size-4 transition-transform group-hover:rotate-90" aria-hidden />
               Tap for location

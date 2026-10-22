@@ -17,6 +17,15 @@ export interface CouponView {
   wonAt: string;
   expiresAt?: string;
   expired: boolean;
+  usedAt?: string;
+  usedShop?: string;
+}
+
+export type CouponState = "valid" | "used" | "expired";
+
+export function couponState(coupon: CouponView): CouponState {
+  if (coupon.usedAt) return "used";
+  return coupon.expired ? "expired" : "valid";
 }
 
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -73,5 +82,7 @@ export function toCouponView(spin: SpinTransaction, reward: Reward | undefined, 
     wonAt: spin.createdAt,
     expiresAt: spin.rewardExpiresAt,
     expired: Boolean(spin.rewardExpiresAt && Date.parse(spin.rewardExpiresAt) < now),
+    usedAt: spin.redeemedAt,
+    usedShop: spin.redeemedShop,
   };
 }

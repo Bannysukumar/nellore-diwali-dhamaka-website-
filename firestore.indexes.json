@@ -1,6 +1,14 @@
 {
   "indexes": [
     {
+      "collectionGroup": "couponRedemptions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "shopUid", "order": "ASCENDING" },
+        { "fieldPath": "redeemedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "tickets",
       "queryScope": "COLLECTION",
       "fields": [
