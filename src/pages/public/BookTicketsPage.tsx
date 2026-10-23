@@ -6,10 +6,11 @@ import {
   LayoutGrid,
   Loader2,
   Search,
+  Smartphone,
   Ticket as TicketIcon,
   Wallet,
 } from "lucide-react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAsync } from "@/hooks/useAsync";
 import { useDebounced } from "@/hooks/useCollection";
 import { useAuth } from "@/app/AuthProvider";
@@ -44,6 +45,13 @@ import { TicketCounters, TicketGrid } from "@/features/tickets/TicketGrid";
 import { DrawStatusBadge } from "@/features/draws/DrawMeta";
 import { DrawPrizeCard } from "@/features/draws/DrawPrizeCard";
 import { ReadOnlyViewNotice, useReadOnlyView } from "@/features/auth/ViewAs";
+import {
+  PayAndBookDialog,
+  clearPayBookSession,
+  readPayBookSession,
+  type PayBookSession,
+} from "@/features/payments/PayAndBookDialog";
+import { payAmountFor } from "@/features/payments/upi";
 import { formatINR, formatINRPlain } from "@/utils/money";
 import { formatNumber } from "@/utils/format";
 import { newId } from "@/utils/id";
@@ -51,7 +59,6 @@ import { newId } from "@/utils/id";
 type Filter = "all" | "available" | "mine" | "recent";
 
 const PAGE_SIZE = 120;
-const PENDING_BOOKING_KEY = "dd:pending-booking";
 
 export interface LowBalanceState {
   shortfallPaise: number;
@@ -59,33 +66,14 @@ export interface LowBalanceState {
   returnTo: string;
 }
 
-function savePendingBooking(drawId: string, tickets: Ticket[]) {
-  try {
-    sessionStorage.setItem(PENDING_BOOKING_KEY, JSON.stringify({ drawId, tickets }));
-  } catch {
-    /* Storage can be unavailable (private mode); the customer simply re-selects. */
-  }
-}
-
-function takePendingBooking(drawId: string): Ticket[] {
-  try {
-    const raw = sessionStorage.getItem(PENDING_BOOKING_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as { drawId?: string; tickets?: Ticket[] };
-    if (parsed.drawId !== drawId || !Array.isArray(parsed.tickets)) return [];
-    sessionStorage.removeItem(PENDING_BOOKING_KEY);
-    return parsed.tickets;
-  } catch {
-    return [];
-  }
-}
-
 export function BookTicketsPage() {
   const { user, profile } = useAuth();
   const settings = useSiteSettings();
   const toast = useToast();
-  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
+  const [payOpen, setPayOpen] = useState(false);
+  const [payResume, setPayResume] = useState<PayBookSession | null>(null);
+  const [missingAppId, setMissingAppId] = useState<string | null>(null);
 
   const draws = useAsync(() => drawService.listPublic(50), []);
   const publicDraws = useMemo(() => draws.data ?? [], [draws.data]);
@@ -151,13 +139,24 @@ export function BookTicketsPage() {
     { enabled: Boolean(user) },
   );
 
-  /* Selection belongs to one draw only; a selection parked while adding money is restored. */
+  /* Selection belongs to one draw only. A pay-and-book in progress (e.g. back from a UPI app) reopens. */
   useEffect(() => {
-    const restored = selectedDrawId ? takePendingBooking(selectedDrawId) : [];
-    setSelected(new Map(restored.map((ticket) => [ticket.id, ticket])));
+    setSelected(new Map());
     setQuery("");
     setSearchResults([]);
+    const resume = selectedDrawId ? readPayBookSession(selectedDrawId) : null;
+    setPayResume(resume);
+    setPayOpen(Boolean(resume && resume.step !== "waiting"));
   }, [selectedDrawId]);
+
+  useEffect(() => {
+    const missing = params.get("upi_missing");
+    if (!missing) return;
+    setMissingAppId(missing);
+    const next = new URLSearchParams(params);
+    next.delete("upi_missing");
+    setParams(next, { replace: true });
+  }, [params, setParams]);
 
   /* Only the "My tickets" filter depends on who is signed in. */
   const gridOwnerUid = filter === "mine" ? user?.uid : undefined;
@@ -294,22 +293,38 @@ export function BookTicketsPage() {
   const balance = wallet.data?.balancePaise ?? 0;
   const balanceKnown = Boolean(wallet.data) && !wallet.error;
   const shortfall = balanceKnown ? Math.max(0, totalPaise - balance) : 0;
+  const payNowPaise = payAmountFor(shortfall, settings.minDepositPaise, settings.maxDepositPaise);
 
-  const goAddMoney = (shortfallPaise: number) => {
-    if (!draw) return;
-    savePendingBooking(draw.id, Array.from(selected.values()));
-    const state: LowBalanceState = {
-      shortfallPaise,
-      tickets: selected.size,
-      returnTo: bookingPath,
-    };
-    navigate("/dashboard/add-money", { state });
+  const openPayAndBook = () => {
+    setPayResume(null);
+    setMissingAppId(null);
+    setPayOpen(true);
+  };
+
+  const closePayAndBook = () => {
+    setPayOpen(false);
+    setMissingAppId(null);
+    setPayResume(draw ? readPayBookSession(draw.id) : null);
+  };
+
+  const onPayBooked = useCallback(() => {
+    setSelected(new Map());
+    setRefreshKey((n) => n + 1);
+    toast.success("Tickets booked", "Your payment was verified and the tickets are now yours.");
+  }, [toast]);
+
+  const reselectAfterPay = () => {
+    clearPayBookSession();
+    setPayOpen(false);
+    setPayResume(null);
+    setSelected(new Map());
+    setRefreshKey((n) => n + 1);
   };
 
   const openConfirm = () => {
     if (!draw) return;
     if (shortfall > 0) {
-      goAddMoney(shortfall);
+      openPayAndBook();
       return;
     }
     setPurchaseError(null);
@@ -339,7 +354,8 @@ export function BookTicketsPage() {
       const message = error instanceof Error ? error.message : "The purchase could not be completed.";
       if (message.startsWith("Insufficient wallet balance")) {
         setConfirmOpen(false);
-        goAddMoney(Math.max(0, totalPaise - balance));
+        wallet.reload();
+        openPayAndBook();
         return;
       }
       setPurchaseError(message);
@@ -696,9 +712,26 @@ export function BookTicketsPage() {
                   ) : null}
 
                   {shortfall > 0 && selected.size > 0 ? (
-                    <Alert tone="warning" title="Not enough wallet balance">
-                      Add {formatINR(shortfall)} to complete this order. The button below takes you to Add
-                      money and keeps your selected numbers.
+                    payNowPaise === null ? (
+                      <Alert tone="warning" title="Too many numbers for one payment">
+                        One payment can be at most {formatINR(settings.maxDepositPaise)}. Remove a few numbers to
+                        continue.
+                      </Alert>
+                    ) : (
+                      <Alert tone="info" title="Pay by UPI and book">
+                        Pay {formatINR(payNowPaise)} with PhonePe, Google Pay or any UPI app. Your numbers are
+                        reserved and booked automatically as soon as the payment is verified.
+                      </Alert>
+                    )
+                  ) : null}
+
+                  {payResume?.step === "waiting" && !payOpen ? (
+                    <Alert tone="warning" title="Payment being verified">
+                      {payResume.tickets.length} ticket{payResume.tickets.length === 1 ? "" : "s"} will be booked
+                      once your payment is approved.{" "}
+                      <button type="button" className="font-semibold text-brand hover:underline" onClick={() => setPayOpen(true)}>
+                        View status
+                      </button>
                     </Alert>
                   ) : null}
 
@@ -713,10 +746,11 @@ export function BookTicketsPage() {
                       block
                       size="lg"
                       variant="gold"
-                      onClick={() => goAddMoney(shortfall)}
-                      iconLeft={<Wallet className="size-4" aria-hidden />}
+                      disabled={payNowPaise === null}
+                      onClick={openPayAndBook}
+                      iconLeft={<Smartphone className="size-4" aria-hidden />}
                     >
-                      Add {formatINR(shortfall)} to continue
+                      Pay {formatINR(payNowPaise ?? shortfall)} &amp; book
                     </Button>
                   ) : (
                     <Button
@@ -737,7 +771,7 @@ export function BookTicketsPage() {
                   )}
 
                   <p className="text-[11px] leading-relaxed text-muted">
-                    Payment is taken from your wallet. Your numbers are locked and your balance is
+                    Tickets are paid from your wallet. Your numbers are locked and your balance is
                     debited in the same server-side transaction — the grid is never trusted.
                   </p>
                 </CardBody>
@@ -781,6 +815,19 @@ export function BookTicketsPage() {
           </div>
         )}
       </div>
+
+      {payOpen && draw && user ? (
+        <PayAndBookDialog
+          draw={draw}
+          tickets={Array.from(selected.values()).map((t) => ({ id: t.id, numberLabel: t.numberLabel }))}
+          shortfallPaise={Math.max(shortfall, totalPaise - balance)}
+          resume={payResume}
+          missingAppId={missingAppId}
+          onClose={closePayAndBook}
+          onBooked={onPayBooked}
+          onReselect={reselectAfterPay}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={confirmOpen}

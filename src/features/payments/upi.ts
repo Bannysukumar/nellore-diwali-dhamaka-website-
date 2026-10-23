@@ -43,6 +43,12 @@ export function appsForPlatform(platform: DevicePlatform): UpiApp[] {
   return [];
 }
 
+/** Amount to pay for a shortfall: whole rupees, at least the minimum deposit; null when one payment cannot cover it. */
+export function payAmountFor(shortfallPaise: number, minPaise: number, maxPaise: number): number | null {
+  const amount = Math.max(Math.ceil(shortfallPaise / 100) * 100, minPaise);
+  return amount <= maxPaise ? amount : null;
+}
+
 export interface UpiPayment {
   upiId: string;
   payeeName: string;

@@ -99,6 +99,9 @@ export interface Ticket {
   prizeTier?: PrizeTier;
   prizeTitle?: string;
   blockedReason?: string;
+  /** Set while the number is held for a deposit that is awaiting verification. */
+  holdDepositId?: string;
+  heldUntil?: ISODate;
   updatedAt: ISODate;
 }
 
@@ -176,6 +179,24 @@ export interface WalletTransaction {
 
 export type DepositStatus = "pending" | "approved" | "rejected" | "requires_review";
 
+export type DepositBookingStatus = "waiting" | "booked" | "failed" | "cancelled";
+
+/** Tickets bought from the wallet as soon as the deposit they were paid with is approved. */
+export interface DepositBooking {
+  drawId: string;
+  drawTitle: string;
+  ticketIds: string[];
+  ticketLabels: string[];
+  unitPricePaise: number;
+  totalPaise: number;
+  status: DepositBookingStatus;
+  heldUntil: ISODate;
+  orderId?: string;
+  ticketNumbers?: number[];
+  bookedAt?: ISODate;
+  failureReason?: string;
+}
+
 export interface DepositRequest {
   id: string;
   uid: string;
@@ -197,6 +218,7 @@ export interface DepositRequest {
   creditedTransactionId?: string;
   /** Amount actually credited; `amountPaise` always keeps what the customer declared. */
   verifiedAmountPaise?: number;
+  booking?: DepositBooking;
 }
 
 export interface PaymentQrCode {

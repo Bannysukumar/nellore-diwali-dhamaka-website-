@@ -1,4 +1,4 @@
-import type { CouponRedemption, DepositStatus, RewardType, UserRole } from "@/types";
+import type { CouponRedemption, DepositBookingStatus, DepositStatus, RewardType, UserRole } from "@/types";
 
 /**
  * Request/response contract of the Cloud Functions callables. Mirrors
@@ -75,6 +75,8 @@ export interface SubmitDepositRequest {
   screenshotPath: string;
   screenshotUrl?: string;
   requestId: string;
+  /** Numbers to hold now and buy from the wallet as soon as this deposit is approved. */
+  booking?: { drawId: string; ticketIds: string[] };
 }
 export interface SubmitDepositResponse {
   depositId: string;
@@ -94,6 +96,12 @@ export interface ReviewDepositResponse {
   status: DepositStatus;
   creditedPaise: number;
   balancePaise: number;
+  booking?: {
+    status: DepositBookingStatus;
+    orderId?: string;
+    ticketNumbers?: number[];
+    failureReason?: string;
+  };
 }
 
 /* ------------------------------------------------------------- tickets ---- */

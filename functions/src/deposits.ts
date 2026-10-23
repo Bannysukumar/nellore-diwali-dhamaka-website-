@@ -1,4 +1,6 @@
-import { onCall } from "firebase-functions/v2/https";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { logger } from "firebase-functions/v2";
+import { FieldValue } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { hotCallable } from "./warm.js";
 import {
@@ -12,20 +14,34 @@ import {
   enforceRateLimit,
   notify,
   readDoc,
+  readDraw,
   readSettings,
   readWallet,
   requireUser,
   walletBalance,
 } from "./firestore.js";
 import {
+  alreadyExists,
   failedPrecondition,
   invalidArgument,
   notFound,
   requireObject,
   requireRequestId,
   requireString,
+  requireStringArray,
 } from "./errors.js";
-import type { DepositRequest, DepositStatus, PaymentQrCode } from "./domain/types.js";
+import { assertDrawOpen, assertSelection, bookTickets } from "./tickets.js";
+import type {
+  DepositBooking,
+  DepositBookingStatus,
+  DepositRequest,
+  DepositStatus,
+  Draw,
+  PaymentQrCode,
+  SiteSettings,
+  Ticket,
+  UserProfile,
+} from "./domain/types.js";
 import { formatPaise, hashString, isPositiveInteger, maskUtr, nowIso } from "./domain/shared.js";
 import { qualifyOnActivitySafely } from "./domain/referrals.js";
 
@@ -132,6 +148,7 @@ export const submitDeposit = hotCallable(async (request): Promise<SubmitDepositR
   }
 
   await enforceRateLimit(user.uid, "submitDeposit", { max: 5, windowSeconds: 600 });
+  const bookingRequest = data.booking === undefined ? null : await readBookingRequest(data.booking, config);
 
   const [screenshotExists] = await getStorage().bucket().file(screenshotPath).exists();
   if (!screenshotExists) {
@@ -177,19 +194,35 @@ export const submitDeposit = hotCallable(async (request): Promise<SubmitDepositR
     const wallet = await readWallet(tx, user.uid);
     if (existingDeposit.exists) return false; // lost a race — the winner already wrote it
 
-    tx.set(depositRef, deposit);
+    const hold = bookingRequest
+      ? await checkBookingHold(tx, bookingRequest, user.uid, amountPaise, wallet.account.balancePaise)
+      : null;
+
+    tx.set(depositRef, hold ? { ...deposit, booking: hold.booking } : deposit);
     adjustPending(tx, wallet, amountPaise);
+    for (const ticketId of hold?.booking.ticketIds ?? []) {
+      tx.update(db().collection(COLLECTIONS.tickets).doc(ticketId), {
+        status: "pending",
+        holdDepositId: requestId,
+        heldUntil: hold!.booking.heldUntil,
+        updatedAt: submittedAt,
+      });
+    }
     return true;
   });
 
   const stored = await readDoc<DepositRequest>(COLLECTIONS.depositRequests, requestId);
   if (created) {
+    const booking = stored?.booking;
     await notify(
       user.uid,
       "deposit_submitted",
       "Deposit submitted",
-      `Request ${requestId} for ${formatPaise(amountPaise)} is awaiting verification (UTR ${maskUtr(utr)}).`,
-      "/dashboard/wallet",
+      booking
+        ? `Request ${requestId} for ${formatPaise(amountPaise)} is awaiting verification (UTR ${maskUtr(utr)}). ` +
+            `Ticket${booking.ticketLabels.length === 1 ? "" : "s"} ${booking.ticketLabels.join(", ")} will be booked as soon as it is approved.`
+        : `Request ${requestId} for ${formatPaise(amountPaise)} is awaiting verification (UTR ${maskUtr(utr)}).`,
+      booking ? `/book?draw=${encodeURIComponent(booking.drawId)}` : "/dashboard/wallet",
     );
   }
   return {
@@ -199,6 +232,177 @@ export const submitDeposit = hotCallable(async (request): Promise<SubmitDepositR
   };
 });
 
+/* --------------------------------------------------------- deposit bookings */
+
+/** How long chosen numbers stay reserved while their payment awaits verification. */
+export const BOOKING_HOLD_MS = 24 * 3_600_000;
+
+interface BookingRequest {
+  draw: Draw & { id: string };
+  ticketIds: string[];
+}
+
+async function readBookingRequest(raw: unknown, config: SiteSettings): Promise<BookingRequest> {
+  const booking = requireObject<Record<string, unknown>>(raw);
+  const drawId = requireString(booking, "drawId", 120);
+  const ticketIds = Array.from(new Set(requireStringArray(booking, "ticketIds", { min: 1, max: 50 })));
+  const draw = await readDraw(drawId);
+  assertDrawOpen(draw, config);
+  assertSelection(config, ticketIds, draw);
+  return { draw, ticketIds };
+}
+
+/** Transaction reads that decide whether the chosen numbers can be held for this deposit. */
+async function checkBookingHold(
+  tx: FirebaseFirestore.Transaction,
+  { draw, ticketIds }: BookingRequest,
+  uid: string,
+  amountPaise: number,
+  balancePaise: number,
+): Promise<{ booking: DepositBooking }> {
+  const waiting = await tx.get(
+    db()
+      .collection(COLLECTIONS.depositRequests)
+      .where("uid", "==", uid)
+      .where("booking.status", "==", "waiting")
+      .limit(1),
+  );
+  const owned = await tx.get(
+    db().collection(COLLECTIONS.tickets).where("drawId", "==", draw.id).where("ownerUid", "==", uid),
+  );
+  const snaps = await Promise.all(ticketIds.map((id) => tx.get(db().collection(COLLECTIONS.tickets).doc(id))));
+
+  if (!waiting.empty) {
+    failedPrecondition(
+      "You already have tickets waiting for a payment to be verified. Once that payment is approved or rejected you can book more.",
+    );
+  }
+  if (owned.size + ticketIds.length > draw.maxTicketsPerUser) {
+    failedPrecondition(
+      `This draw allows at most ${draw.maxTicketsPerUser} tickets per account. You already hold ${owned.size}.`,
+    );
+  }
+  const tickets = snaps.map((snap) => {
+    if (!snap.exists) notFound("A selected ticket no longer exists.");
+    const ticket = snap.data() as Ticket;
+    if (ticket.drawId !== draw.id) invalidArgument("A selected ticket belongs to another draw.");
+    if (ticket.status !== "available") {
+      alreadyExists(`Ticket ${ticket.numberLabel} was just taken by someone else. Pick another number.`);
+    }
+    return ticket;
+  });
+
+  const totalPaise = tickets.length * draw.ticketPricePaise;
+  if (amountPaise + balancePaise < totalPaise) {
+    invalidArgument(`Pay at least ${formatPaise(totalPaise - balancePaise)} to book these tickets.`);
+  }
+  return {
+    booking: {
+      drawId: draw.id,
+      drawTitle: draw.title,
+      ticketIds,
+      ticketLabels: tickets.map((t) => t.numberLabel),
+      unitPricePaise: draw.ticketPricePaise,
+      totalPaise,
+      status: "waiting",
+      heldUntil: new Date(Date.now() + BOOKING_HOLD_MS).toISOString(),
+    },
+  };
+}
+
+/** Returns numbers held for a deposit to the open inventory; numbers already sold are untouched. */
+export async function releaseHolds(depositId: string, ticketIds: string[]): Promise<number> {
+  const refs = ticketIds.map((id) => db().collection(COLLECTIONS.tickets).doc(id));
+  return db().runTransaction(async (tx) => {
+    const snaps = await Promise.all(refs.map((ref) => tx.get(ref)));
+    const at = nowIso();
+    let released = 0;
+    snaps.forEach((snap, index) => {
+      const ticket = snap.data() as Ticket | undefined;
+      if (ticket?.status !== "pending" || ticket.holdDepositId !== depositId) return;
+      tx.update(refs[index], {
+        status: "available",
+        holdDepositId: FieldValue.delete(),
+        heldUntil: FieldValue.delete(),
+        updatedAt: at,
+      });
+      released += 1;
+    });
+    return released;
+  });
+}
+
+export interface DepositBookingOutcome {
+  status: DepositBookingStatus;
+  orderId?: string;
+  ticketNumbers?: number[];
+  failureReason?: string;
+}
+
+/** Buys the held numbers from the wallet the moment their deposit is credited. */
+async function completeDepositBooking(deposit: DepositRequest & { id: string }): Promise<DepositBookingOutcome> {
+  const booking = deposit.booking!;
+  const depositRef = db().collection(COLLECTIONS.depositRequests).doc(deposit.id);
+  const orderId = `ord_${deposit.uid.slice(0, 12)}_${deposit.id}`;
+
+  let result: Awaited<ReturnType<typeof bookTickets>> | null = null;
+  let failureReason = "The tickets could not be booked.";
+  try {
+    const user = await readDoc<UserProfile>(COLLECTIONS.users, deposit.uid);
+    if (!user || user.status === "suspended") failedPrecondition("This account cannot buy tickets right now.");
+    const [config, draw] = await Promise.all([readSettings(), readDraw(booking.drawId)]);
+    result = await bookTickets({
+      user,
+      config,
+      draw,
+      ticketIds: booking.ticketIds,
+      orderId,
+      requestId: deposit.id,
+      holdDepositId: deposit.id,
+    });
+  } catch (error) {
+    if (error instanceof HttpsError) failureReason = error.message;
+    else logger.error("Deposit booking failed", { depositId: deposit.id, error });
+  }
+
+  if (!result) {
+    await releaseHolds(deposit.id, booking.ticketIds);
+    await depositRef.update({ "booking.status": "failed", "booking.failureReason": failureReason });
+    await notify(
+      deposit.uid,
+      "ticket_purchase",
+      "Tickets not booked",
+      `${failureReason} Your payment is in your wallet, so you can pick numbers again and pay from the wallet.`,
+      `/book?draw=${encodeURIComponent(booking.drawId)}`,
+    );
+    return { status: "failed", failureReason };
+  }
+
+  await depositRef.update({
+    "booking.status": "booked",
+    "booking.orderId": result.orderId,
+    "booking.ticketNumbers": result.ticketNumbers,
+    "booking.bookedAt": result.createdAt,
+  });
+  if (!result.replay) {
+    await notify(
+      deposit.uid,
+      "ticket_purchase",
+      "Tickets confirmed",
+      `Payment verified. ${result.ticketNumbers.length} ticket(s) confirmed for ${booking.drawTitle}: ${booking.ticketLabels.join(", ")}.`,
+      "/dashboard/tickets",
+    );
+    await qualifyOnActivitySafely(deposit.uid, "ticket_purchase");
+  }
+  return { status: "booked", orderId: result.orderId, ticketNumbers: result.ticketNumbers };
+}
+
+async function cancelDepositBooking(deposit: DepositRequest & { id: string }): Promise<DepositBookingOutcome> {
+  await releaseHolds(deposit.id, deposit.booking!.ticketIds);
+  await db().collection(COLLECTIONS.depositRequests).doc(deposit.id).update({ "booking.status": "cancelled" });
+  return { status: "cancelled" };
+}
+
 /* ------------------------------------------------------------ reviewDeposit */
 
 export interface ReviewDepositResponse {
@@ -206,6 +410,7 @@ export interface ReviewDepositResponse {
   status: DepositStatus;
   creditedPaise: number;
   balancePaise: number;
+  booking?: DepositBookingOutcome;
 }
 
 const OPEN_STATUSES: DepositStatus[] = ["pending", "requires_review"];
@@ -331,6 +536,7 @@ export const reviewDeposit = onCall<unknown>(CALLABLE_OPTIONS, async (request): 
   });
 
   const { deposit } = outcome;
+  let booking: DepositBookingOutcome | undefined;
   if (outcome.changed) {
     if (outcome.status === "approved") {
       await notify(
@@ -340,10 +546,11 @@ export const reviewDeposit = onCall<unknown>(CALLABLE_OPTIONS, async (request): 
         `${formatPaise(outcome.creditedPaise)} has been added to your wallet.`,
         "/dashboard/wallet",
       );
+      if (deposit.booking?.status === "waiting") booking = await completeDepositBooking(deposit);
       await audit(admin, "deposit.approve", COLLECTIONS.depositRequests, deposit.id, note, {
         status: deposit.status,
         amountPaise: deposit.amountPaise,
-      }, { status: "approved", creditedPaise: outcome.creditedPaise });
+      }, clean({ status: "approved", creditedPaise: outcome.creditedPaise, booking: booking?.status, orderId: booking?.orderId }));
       await qualifyOnActivitySafely(deposit.uid, "verified_deposit");
     } else if (outcome.status === "rejected") {
       await notify(
@@ -353,6 +560,7 @@ export const reviewDeposit = onCall<unknown>(CALLABLE_OPTIONS, async (request): 
         `${reason} You can submit a new request with the correct details.`,
         "/dashboard/add-money",
       );
+      if (deposit.booking?.status === "waiting") booking = await cancelDepositBooking(deposit);
       await audit(admin, "deposit.reject", COLLECTIONS.depositRequests, deposit.id, reason, {
         status: deposit.status,
       }, { status: "rejected" });
@@ -365,6 +573,7 @@ export const reviewDeposit = onCall<unknown>(CALLABLE_OPTIONS, async (request): 
     depositId: deposit.id,
     status: outcome.status,
     creditedPaise: outcome.creditedPaise,
-    balancePaise: outcome.changed ? outcome.balancePaise : await walletBalance(deposit.uid),
+    balancePaise: booking?.status === "booked" || !outcome.changed ? await walletBalance(deposit.uid) : outcome.balancePaise,
+    booking,
   };
 });

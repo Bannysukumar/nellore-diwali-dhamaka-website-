@@ -149,9 +149,15 @@ export function AdminDepositsPage() {
         reason: decision === "reject" ? reason.trim() : undefined,
         verifiedAmountPaise,
       });
+      const bookingNote =
+        result.booking?.status === "booked"
+          ? ` ${result.booking.ticketNumbers?.length ?? 0} ticket(s) booked automatically.`
+          : result.booking?.status === "failed"
+            ? ` Tickets not booked: ${result.booking.failureReason ?? "unknown reason"} The money stays in the wallet.`
+            : "";
       const message =
         decision === "approve"
-          ? `${formatINR(result.creditedPaise)} credited. New balance ${formatINR(result.balancePaise)}.`
+          ? `${formatINR(result.creditedPaise)} credited.${bookingNote} New balance ${formatINR(result.balancePaise)}.`
           : decision === "reject"
             ? "The deposit was rejected and the customer was notified."
             : "The deposit was flagged for additional review.";
@@ -213,6 +219,12 @@ export function AdminDepositsPage() {
       render: (row) => (
         <div className="flex flex-col items-end gap-1 sm:items-start">
           <Badge tone={TONE[row.status]}>{LABEL[row.status]}</Badge>
+          {row.booking ? (
+            <span className="text-[11px] font-semibold text-gold-deep">
+              + {row.booking.ticketLabels.length} ticket{row.booking.ticketLabels.length === 1 ? "" : "s"}
+              {row.booking.status !== "waiting" ? ` · ${row.booking.status}` : ""}
+            </span>
+          ) : null}
         </div>
       ),
     },
@@ -350,6 +362,24 @@ export function AdminDepositsPage() {
                 <Detail label="UTR / reference" value={selected.utr} mono />
                 <Detail label="Paid to" value={`${selected.qrLabel} · ${selected.qrUpiId ?? "—"}`} />
               </dl>
+
+              {selected.booking ? (
+                <Alert
+                  tone={selected.booking.status === "failed" ? "warning" : "info"}
+                  title={
+                    selected.booking.status === "waiting"
+                      ? "Approving also books tickets"
+                      : `Ticket booking: ${selected.booking.status}`
+                  }
+                >
+                  {selected.booking.ticketLabels.length} ticket
+                  {selected.booking.ticketLabels.length === 1 ? "" : "s"} in {selected.booking.drawTitle} (
+                  {selected.booking.ticketLabels.join(", ")}) for {formatINR(selected.booking.totalPaise)}.{" "}
+                  {selected.booking.status === "waiting"
+                    ? "They are reserved for this customer and are paid from the wallet the moment you approve. Rejecting releases them."
+                    : selected.booking.failureReason ?? (selected.booking.orderId ? `Order ${selected.booking.orderId}.` : "")}
+                </Alert>
+              ) : null}
 
               <div className="rounded-xl border border-line bg-ivory/50 p-3">
                 <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted">

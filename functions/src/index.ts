@@ -29,6 +29,7 @@ export {
   remindDraw,
   releaseUnpublishedDraws,
   verifyOrderIntegrity,
+  releaseExpiredHolds,
 } from "./scheduled.js";
 export { keepCallablesWarm } from "./warm.js";
 

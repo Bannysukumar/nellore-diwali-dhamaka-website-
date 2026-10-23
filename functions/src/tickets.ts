@@ -1,4 +1,5 @@
 import { onCall } from "firebase-functions/v2/https";
+import { FieldValue } from "firebase-admin/firestore";
 import { hotCallable } from "./warm.js";
 import {
   CALLABLE_OPTIONS,
@@ -25,7 +26,7 @@ import {
   requireString,
   requireStringArray,
 } from "./errors.js";
-import type { Draw, Order, SiteSettings, Ticket } from "./domain/types.js";
+import type { Draw, Order, SiteSettings, Ticket, UserProfile } from "./domain/types.js";
 import { displayName, formatPaise, nowIso } from "./domain/shared.js";
 import { qualifyOnActivitySafely } from "./domain/referrals.js";
 
@@ -67,7 +68,46 @@ export const purchaseTickets = hotCallable(async (request): Promise<PurchaseTick
   const draw = await readDraw(drawId);
   assertSelection(config, unique, draw);
 
-  const outcome = await db().runTransaction(async (tx) => {
+  const outcome = await bookTickets({ user, config, draw, ticketIds: unique, orderId, requestId });
+
+  if (!outcome.replay) {
+    await notify(
+      user.uid,
+      "ticket_purchase",
+      "Tickets confirmed",
+      `${outcome.ticketNumbers.length} ticket(s) confirmed for ${draw.title}. Order ${orderId}.`,
+      "/dashboard/tickets",
+    );
+    await qualifyOnActivitySafely(user.uid, "ticket_purchase");
+  }
+
+  return {
+    orderId: outcome.orderId,
+    drawId: outcome.drawId,
+    ticketNumbers: outcome.ticketNumbers,
+    totalPaise: outcome.totalPaise,
+    balancePaise: outcome.balancePaise,
+    createdAt: outcome.createdAt,
+  };
+});
+
+export interface BookTicketsInput {
+  user: Pick<UserProfile, "uid" | "fullName">;
+  config: Pick<SiteSettings, "allowPaidDraws">;
+  draw: Draw & { id: string };
+  ticketIds: string[];
+  orderId: string;
+  requestId: string;
+  /** Numbers held for this deposit may be booked as well as available ones. */
+  holdDepositId?: string;
+}
+
+/** The single wallet-debit-and-assign transaction behind every ticket sale. */
+export async function bookTickets(
+  input: BookTicketsInput,
+): Promise<PurchaseTicketsResponse & { replay: boolean }> {
+  const { user, config, draw, ticketIds: unique, orderId, requestId, holdDepositId } = input;
+  return db().runTransaction(async (tx) => {
     // ---- read phase: every tx.get happens before the first write ---------
     const orderRef = db().collection(COLLECTIONS.orders).doc(orderId);
     const orderSnap = await tx.get(orderRef);
@@ -109,7 +149,8 @@ export const purchaseTickets = hotCallable(async (request): Promise<PurchaseTick
       if (!snap.exists) notFound("A selected ticket no longer exists.");
       const ticket = { ...(snap.data() as Ticket), id: snap.id };
       if (ticket.drawId !== liveDraw.id) invalidArgument("A selected ticket belongs to another draw.");
-      if (ticket.status !== "available") {
+      const heldForUs = Boolean(holdDepositId) && ticket.status === "pending" && ticket.holdDepositId === holdDepositId;
+      if (ticket.status !== "available" && !heldForUs) {
         alreadyExists(`Ticket ${ticket.numberLabel} is no longer available. Please refresh your selection.`);
       }
       tickets.push(ticket);
@@ -140,9 +181,8 @@ export const purchaseTickets = hotCallable(async (request): Promise<PurchaseTick
 
     const masked = displayName(user.fullName);
     for (const ticket of tickets) {
-      tx.update(
-        db().collection(COLLECTIONS.tickets).doc(ticket.id),
-        clean({
+      tx.update(db().collection(COLLECTIONS.tickets).doc(ticket.id), {
+        ...clean({
           status: "booked",
           ownerUid: user.uid,
           ownerMaskedName: masked,
@@ -151,7 +191,9 @@ export const purchaseTickets = hotCallable(async (request): Promise<PurchaseTick
           pricePaise: liveDraw.ticketPricePaise,
           updatedAt: createdAt,
         }),
-      );
+        holdDepositId: FieldValue.delete(),
+        heldUntil: FieldValue.delete(),
+      });
     }
     tx.set(
       orderRef,
@@ -182,27 +224,7 @@ export const purchaseTickets = hotCallable(async (request): Promise<PurchaseTick
       createdAt,
     };
   });
-
-  if (!outcome.replay) {
-    await notify(
-      user.uid,
-      "ticket_purchase",
-      "Tickets confirmed",
-      `${outcome.ticketNumbers.length} ticket(s) confirmed for ${draw.title}. Order ${orderId}.`,
-      "/dashboard/tickets",
-    );
-    await qualifyOnActivitySafely(user.uid, "ticket_purchase");
-  }
-
-  return {
-    orderId: outcome.orderId,
-    drawId: outcome.drawId,
-    ticketNumbers: outcome.ticketNumbers,
-    totalPaise: outcome.totalPaise,
-    balancePaise: outcome.balancePaise,
-    createdAt: outcome.createdAt,
-  };
-});
+}
 
 export function assertDrawOpen(
   draw: Draw,
@@ -229,7 +251,7 @@ export function assertDrawOpen(
   }
 }
 
-function assertSelection(
+export function assertSelection(
   config: Pick<SiteSettings, "allowMultiTicketPurchase" | "maxTicketsPerOrder">,
   unique: string[],
   draw: Draw,

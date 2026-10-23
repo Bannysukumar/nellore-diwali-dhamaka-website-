@@ -52,12 +52,23 @@ export function parseYouTubeUrl(input: string): ParsedYouTube {
   return { ok: false, reason: "Paste a YouTube video, live stream or Shorts link." };
 }
 
-/** Privacy-enhanced embed address; autoplay must be muted or browsers block it. */
-export function youtubeEmbedSrc(parsed: Extract<ParsedYouTube, { ok: true }>, autoplay: boolean): string {
+/**
+ * Privacy-enhanced embed address. Autoplay is muted unless the visitor already
+ * asked for sound; `controlOrigin` enables the postMessage player API.
+ */
+export function youtubeEmbedSrc(
+  parsed: Extract<ParsedYouTube, { ok: true }>,
+  autoplay: boolean,
+  options: { muted?: boolean; controlOrigin?: string } = {},
+): string {
   const params = new URLSearchParams({ rel: "0", playsinline: "1", modestbranding: "1" });
   if (autoplay) {
     params.set("autoplay", "1");
-    params.set("mute", "1");
+    params.set("mute", options.muted === false ? "0" : "1");
+  }
+  if (options.controlOrigin) {
+    params.set("enablejsapi", "1");
+    params.set("origin", options.controlOrigin);
   }
   if (parsed.kind === "channel") {
     params.set("channel", parsed.channelId);

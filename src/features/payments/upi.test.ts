@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { UPI_APPS, appsForPlatform, detectPlatform, upiLaunchUrl, upiQuery } from "./upi";
+import { UPI_APPS, appsForPlatform, detectPlatform, payAmountFor, upiLaunchUrl, upiQuery } from "./upi";
+
+describe("payAmountFor", () => {
+  it("rounds the shortfall up to whole rupees", () => {
+    expect(payAmountFor(49_900, 10_000, 5_000_000)).toBe(49_900);
+    expect(payAmountFor(12_345, 10_000, 5_000_000)).toBe(12_400);
+  });
+
+  it("never asks for less than the minimum deposit", () => {
+    expect(payAmountFor(5_000, 10_000, 5_000_000)).toBe(10_000);
+  });
+
+  it("refuses an order one payment cannot cover", () => {
+    expect(payAmountFor(6_000_000, 10_000, 5_000_000)).toBeNull();
+  });
+});
 
 const payment = { upiId: "nellore.vrc@okaxis", payeeName: "Nellore VRC & Co", amountPaise: 50_050, note: "Wallet deposit" };
 const fallback = "https://nellorediwalidhamaka.com/dashboard/add-money?upi_missing=phonepe";

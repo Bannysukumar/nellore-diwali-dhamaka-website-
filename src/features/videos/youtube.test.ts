@@ -56,6 +56,16 @@ describe("youtubeEmbedSrc", () => {
     expect(youtubeEmbedSrc(parsed, false)).toContain(`live_stream?`);
     expect(youtubeEmbedSrc(parsed, false)).toContain(`channel=${CHANNEL}`);
   });
+
+  it("plays with sound once asked and enables the player API for the site origin", () => {
+    const parsed = parseYouTubeUrl(`https://youtu.be/${ID}`);
+    if (!parsed.ok) throw new Error("parse failed");
+    const src = youtubeEmbedSrc(parsed, true, { muted: false, controlOrigin: "https://example.com" });
+    expect(src).toContain("mute=0");
+    expect(src).toContain("enablejsapi=1");
+    expect(src).toContain(`origin=${encodeURIComponent("https://example.com")}`);
+    expect(youtubeEmbedSrc(parsed, false)).not.toContain("enablejsapi");
+  });
 });
 
 describe("page matching", () => {

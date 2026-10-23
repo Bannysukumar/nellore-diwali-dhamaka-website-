@@ -2,6 +2,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { COLLECTIONS, clean, db, readDoc } from "./firestore.js";
 import type { Draw, Order, UserProfile } from "./domain/types.js";
 import { nowIso } from "./domain/shared.js";
+import { releaseHolds } from "./deposits.js";
 
 /**
  * Housekeeping jobs.
@@ -33,6 +34,23 @@ export const openSales = onSchedule({ schedule: "every 5 minutes", timeZone: IST
     opened += 1;
   }
   if (opened) console.log(`openSales: opened ${opened} draw(s).`);
+});
+
+/**
+ * Frees numbers held for deposits that were not decided within the hold window.
+ * The deposit itself stays in the queue; if it is approved later the booking is
+ * retried and only succeeds if the numbers are still free.
+ */
+export const releaseExpiredHolds = onSchedule({ schedule: "every 15 minutes", timeZone: IST }, async () => {
+  const snap = await db().collection(COLLECTIONS.tickets).where("heldUntil", "<=", nowIso()).limit(500).get();
+  const byDeposit = new Map<string, string[]>();
+  for (const doc of snap.docs) {
+    const depositId = doc.get("holdDepositId") as string | undefined;
+    if (depositId) byDeposit.set(depositId, [...(byDeposit.get(depositId) ?? []), doc.id]);
+  }
+  let released = 0;
+  for (const [depositId, ticketIds] of byDeposit) released += await releaseHolds(depositId, ticketIds);
+  if (released) console.log(`releaseExpiredHolds: released ${released} ticket(s).`);
 });
 
 /** Closes sales for draws whose window has elapsed. Runs every 5 minutes. */

@@ -97,6 +97,27 @@ export const walletService = {
     return store.get<DepositRequest>("depositRequests", id);
   },
 
+  /** Live view of one of the caller's own deposits, e.g. to follow a pay-and-book request. */
+  watchDeposit(
+    uid: string,
+    id: string,
+    cb: (deposit: DepositRequest | null) => void,
+    onError?: (error: Error) => void,
+  ): () => void {
+    return store.subscribe<DepositRequest>(
+      "depositRequests",
+      {
+        where: [
+          { field: "uid", op: "==", value: uid },
+          { field: "id", op: "==", value: id },
+        ],
+        limit: 1,
+      },
+      (rows) => cb(rows[0] ?? null),
+      onError,
+    );
+  },
+
   async qrCodes(activeOnly = false): Promise<PaymentQrCode[]> {
     return store.list<PaymentQrCode>("paymentQrCodes", {
       where: activeOnly ? [{ field: "active", op: "==", value: true }] : undefined,
