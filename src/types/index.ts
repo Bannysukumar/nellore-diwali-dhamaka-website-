@@ -509,6 +509,38 @@ export interface SplashConfig {
   updatedAt: ISODate;
 }
 
+/** Public pages an administrator can place a YouTube video on; "all" means every public page. */
+export type VideoPageKey =
+  | "all"
+  | "home"
+  | "draws"
+  | "draw-detail"
+  | "book"
+  | "winners"
+  | "leaderboard"
+  | "products"
+  | "about"
+  | "contact"
+  | "faqs"
+  | "legal"
+  | "login"
+  | "register";
+
+/** A YouTube video or live stream shown on selected public pages (`siteSettings/videos`). */
+export interface SiteVideo {
+  id: string;
+  title: string;
+  /** The link as pasted by the administrator. */
+  url: string;
+  live: boolean;
+  pages: VideoPageKey[];
+  position: "top" | "bottom";
+  /** Starts muted on page load; browsers block autoplay with sound. */
+  autoplay: boolean;
+  enabled: boolean;
+  sortOrder: number;
+}
+
 export interface SiteSettings {
   brandName: string;
   tagline: string;

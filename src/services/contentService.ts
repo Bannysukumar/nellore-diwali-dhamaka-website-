@@ -4,6 +4,7 @@ import type {
   LegalPage,
   PerformanceSettings,
   SiteSettings,
+  SiteVideo,
   SplashConfig,
   TicketPackage,
   WinnerAnnouncement,
@@ -74,6 +75,19 @@ export const contentService = {
   async savePackages(items: TicketPackage[]) {
     await store.set("siteSettings", "packages", {
       items: items.sort((a, b) => a.sortOrder - b.sortOrder),
+      updatedAt: new Date().toISOString(),
+    });
+  },
+
+  /** Every YouTube video placement, including disabled ones, for the admin editor. */
+  async allVideos(): Promise<SiteVideo[]> {
+    const row = await store.get<{ items?: SiteVideo[] }>("siteSettings", "videos");
+    return (row?.items ?? []).sort((a, b) => a.sortOrder - b.sortOrder);
+  },
+
+  async saveVideos(items: SiteVideo[]) {
+    await store.set("siteSettings", "videos", {
+      items: items.map((item, index) => ({ ...item, sortOrder: index })),
       updatedAt: new Date().toISOString(),
     });
   },

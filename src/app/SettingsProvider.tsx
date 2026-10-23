@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { SiteSettings, SpinConfig, SplashConfig } from "@/types";
+import type { SiteSettings, SiteVideo, SpinConfig, SplashConfig } from "@/types";
 import { store } from "@/lib/backend";
 
 interface SettingsContextValue {
@@ -14,6 +14,8 @@ interface SettingsContextValue {
   settings: SiteSettings | null;
   splash: SplashConfig | null;
   spin: SpinConfig | null;
+  /** YouTube videos placed on public pages (`siteSettings/videos`). */
+  videos: SiteVideo[];
   loading: boolean;
   error: Error | null;
   reload: () => void;
@@ -52,6 +54,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [splash, setSplash] = useState<SplashConfig | null>(null);
   const [spin, setSpin] = useState<SpinConfig | null>(null);
+  const [videos, setVideos] = useState<SiteVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [nonce, setNonce] = useState(0);
@@ -69,6 +72,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setSettings((byId.general as unknown as SiteSettings) ?? null);
         setSplash((byId.splash as unknown as SplashConfig) ?? null);
         setSpin((byId.spin as unknown as SpinConfig) ?? null);
+        const videoItems = (byId.videos as { items?: unknown } | undefined)?.items;
+        setVideos(Array.isArray(videoItems) ? (videoItems as SiteVideo[]) : []);
         setError(null);
         setLoading(false);
         setFirstResolved(true);
@@ -83,8 +88,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [nonce]);
 
   const value = useMemo<SettingsContextValue>(
-    () => ({ settings, splash, spin, loading, error, reload: () => setNonce((n) => n + 1) }),
-    [settings, splash, spin, loading, error],
+    () => ({ settings, splash, spin, videos, loading, error, reload: () => setNonce((n) => n + 1) }),
+    [settings, splash, spin, videos, loading, error],
   );
 
   return (

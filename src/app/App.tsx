@@ -158,6 +158,9 @@ const AdminLegalPage = lazy(() =>
 const AdminAuditPage = lazy(() =>
   import("@/pages/admin/AuditPage").then((m) => ({ default: m.AdminAuditPage })),
 );
+const AdminVideosPage = lazy(() =>
+  import("@/pages/admin/VideosPage").then((m) => ({ default: m.AdminVideosPage })),
+);
 const AdminSettingsPage = lazy(() =>
   import("@/pages/admin/SettingsPage").then((m) => ({ default: m.AdminSettingsPage })),
 );
@@ -228,6 +231,7 @@ export function App() {
                     <Route path="products" element={<AdminProductsPage />} />
                     <Route path="banners" element={<AdminBannersPage />} />
                     <Route path="splash" element={<AdminSplashPage />} />
+                    <Route path="videos" element={<AdminVideosPage />} />
                     <Route path="draws" element={<AdminDrawsPage />} />
                     <Route path="inventory" element={<AdminInventoryPage />} />
                     <Route path="orders" element={<AdminOrdersPage />} />

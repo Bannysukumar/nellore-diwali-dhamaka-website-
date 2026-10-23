@@ -6,6 +6,7 @@ import { BottomNav } from "./BottomNav";
 import { SplashGate } from "./SplashGate";
 import { WhatsAppButton } from "./WhatsAppButton";
 import { ErrorBoundary } from "@/components/system/ErrorBoundary";
+import { PageVideos } from "@/features/videos/PageVideos";
 
 export function ScrollToTop() {
   const { pathname } = useLocation();
@@ -24,7 +25,9 @@ export function PublicLayout() {
       <Header />
       <main id="main" className="flex-1">
         <ErrorBoundary>
+          <PageVideos position="top" />
           <Outlet />
+          <PageVideos position="bottom" />
         </ErrorBoundary>
       </main>
       <Footer />
