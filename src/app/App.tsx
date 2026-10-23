@@ -20,6 +20,7 @@ import { AccountSuspendedPage } from "@/pages/public/AccountSuspendedPage";
 import { RequireAuth, RequireAdmin } from "@/routes/guards";
 import { ViewAsBanner, ViewAsPage } from "@/features/auth/ViewAs";
 import { LoadingBlock } from "@/components/ui";
+import { ErrorBoundary } from "@/components/system/ErrorBoundary";
 
 /**
  * Route table.
@@ -161,6 +162,9 @@ const AdminAuditPage = lazy(() =>
 const AdminVideosPage = lazy(() =>
   import("@/pages/admin/VideosPage").then((m) => ({ default: m.AdminVideosPage })),
 );
+const AdminNavigationPage = lazy(() =>
+  import("@/pages/admin/NavigationPage").then((m) => ({ default: m.AdminNavigationPage })),
+);
 const AdminSettingsPage = lazy(() =>
   import("@/pages/admin/SettingsPage").then((m) => ({ default: m.AdminSettingsPage })),
 );
@@ -171,92 +175,96 @@ export function App() {
       <SettingsProvider>
         <AuthProvider>
           <ToastProvider>
-            <Suspense
-              fallback={
-                <div className="grid min-h-screen place-items-center bg-ivory px-6">
-                  <LoadingBlock label="Loading…" />
-                </div>
-              }
-            >
-              <ViewAsBanner />
-              <Routes>
-                <Route path="view-as" element={<ViewAsPage />} />
+            {/* Around every route so a dashboard or admin file that fails to load cannot blank the app. */}
+            <ErrorBoundary>
+              <Suspense
+                fallback={
+                  <div className="grid min-h-screen place-items-center bg-ivory px-6">
+                    <LoadingBlock label="Loading…" />
+                  </div>
+                }
+              >
+                <ViewAsBanner />
+                <Routes>
+                  <Route path="view-as" element={<ViewAsPage />} />
 
-                {/* ---------------------------------------------------- public */}
-                <Route element={<PublicLayout />}>
-                  <Route index element={<HomePage />} />
-                  <Route path="draws" element={<DrawsPage />} />
-                  <Route path="draws/:slug" element={<DrawDetailPage />} />
-                  <Route path="winners" element={<WinnersPage />} />
-                  <Route path="leaderboard" element={<LeaderboardPage />} />
-                  <Route path="products" element={<ProductsPage />} />
-                  <Route path="book" element={<BookTicketsPage />} />
-                  <Route path="about" element={<AboutPage />} />
-                  <Route path="contact" element={<ContactPage />} />
-                  <Route path="faqs" element={<FaqsPage />} />
-                  <Route path="legal/:slug" element={<LegalPageView />} />
-                  <Route path="login" element={<LoginPage />} />
-                  <Route path="register" element={<RegisterPage />} />
-                  <Route path="account-suspended" element={<AccountSuspendedPage />} />
-                </Route>
-
-                {/* ------------------------------------------------- customer */}
-                <Route element={<RequireAuth />}>
+                  {/* ---------------------------------------------------- public */}
                   <Route element={<PublicLayout />}>
-                    <Route path="dashboard" element={<DashboardLayout />}>
-                      <Route index element={<DashboardOverviewPage />} />
-                      <Route path="wallet" element={<WalletPage />} />
-                      <Route path="add-money" element={<AddMoneyPage />} />
-                      <Route path="send-money" element={<SendMoneyPage />} />
-                      <Route path="products" element={<DashboardProductsPage />} />
-                      <Route path="tickets" element={<MyTicketsPage />} />
-                      <Route path="tickets/:ticketId" element={<TicketDetailPage />} />
-                      <Route path="referrals" element={<ReferralsPage />} />
-                      <Route path="leaderboard" element={<DashboardLeaderboardPage />} />
-                      <Route path="spin" element={<SpinPage />} />
-                      <Route path="coupons" element={<CouponsPage />} />
-                      <Route path="history" element={<DrawHistoryPage />} />
-                      <Route path="notifications" element={<NotificationsPage />} />
-                      <Route path="profile" element={<ProfilePage />} />
-                      <Route path="support" element={<SupportPage />} />
+                    <Route index element={<HomePage />} />
+                    <Route path="draws" element={<DrawsPage />} />
+                    <Route path="draws/:slug" element={<DrawDetailPage />} />
+                    <Route path="winners" element={<WinnersPage />} />
+                    <Route path="leaderboard" element={<LeaderboardPage />} />
+                    <Route path="products" element={<ProductsPage />} />
+                    <Route path="book" element={<BookTicketsPage />} />
+                    <Route path="about" element={<AboutPage />} />
+                    <Route path="contact" element={<ContactPage />} />
+                    <Route path="faqs" element={<FaqsPage />} />
+                    <Route path="legal/:slug" element={<LegalPageView />} />
+                    <Route path="login" element={<LoginPage />} />
+                    <Route path="register" element={<RegisterPage />} />
+                    <Route path="account-suspended" element={<AccountSuspendedPage />} />
+                  </Route>
+
+                  {/* ------------------------------------------------- customer */}
+                  <Route element={<RequireAuth />}>
+                    <Route element={<PublicLayout />}>
+                      <Route path="dashboard" element={<DashboardLayout />}>
+                        <Route index element={<DashboardOverviewPage />} />
+                        <Route path="wallet" element={<WalletPage />} />
+                        <Route path="add-money" element={<AddMoneyPage />} />
+                        <Route path="send-money" element={<SendMoneyPage />} />
+                        <Route path="products" element={<DashboardProductsPage />} />
+                        <Route path="tickets" element={<MyTicketsPage />} />
+                        <Route path="tickets/:ticketId" element={<TicketDetailPage />} />
+                        <Route path="referrals" element={<ReferralsPage />} />
+                        <Route path="leaderboard" element={<DashboardLeaderboardPage />} />
+                        <Route path="spin" element={<SpinPage />} />
+                        <Route path="coupons" element={<CouponsPage />} />
+                        <Route path="history" element={<DrawHistoryPage />} />
+                        <Route path="notifications" element={<NotificationsPage />} />
+                        <Route path="profile" element={<ProfilePage />} />
+                        <Route path="support" element={<SupportPage />} />
+                      </Route>
+                      <Route path="shop" element={<ShopDashboardPage />} />
                     </Route>
-                    <Route path="shop" element={<ShopDashboardPage />} />
                   </Route>
-                </Route>
 
-                {/* ---------------------------------------------------- admin */}
-                <Route element={<RequireAdmin />}>
-                  <Route path="admin" element={<AdminLayout />}>
-                    <Route index element={<AdminOverviewPage />} />
-                    <Route path="products" element={<AdminProductsPage />} />
-                    <Route path="banners" element={<AdminBannersPage />} />
-                    <Route path="splash" element={<AdminSplashPage />} />
-                    <Route path="videos" element={<AdminVideosPage />} />
-                    <Route path="draws" element={<AdminDrawsPage />} />
-                    <Route path="inventory" element={<AdminInventoryPage />} />
-                    <Route path="orders" element={<AdminOrdersPage />} />
-                    <Route path="deposits" element={<AdminDepositsPage />} />
-                    <Route path="ledger" element={<AdminLedgerPage />} />
-                    <Route path="transfers" element={<AdminTransfersPage />} />
-                    <Route path="payment-qr" element={<AdminPaymentQrPage />} />
-                    <Route path="customers" element={<AdminCustomersPage />} />
-                    <Route path="referrals" element={<AdminReferralsPage />} />
-                    <Route path="spin" element={<AdminSpinPage />} />
-                    <Route path="rewards" element={<AdminRewardsPage />} />
-                    <Route path="winners" element={<AdminWinnersPage />} />
-                    <Route path="announcements" element={<AdminAnnouncementsPage />} />
-                    <Route path="reports" element={<AdminReportsPage />} />
-                    <Route path="legal" element={<AdminLegalPage />} />
-                    <Route path="audit" element={<AdminAuditPage />} />
-                    <Route path="settings" element={<AdminSettingsPage />} />
+                  {/* ---------------------------------------------------- admin */}
+                  <Route element={<RequireAdmin />}>
+                    <Route path="admin" element={<AdminLayout />}>
+                      <Route index element={<AdminOverviewPage />} />
+                      <Route path="products" element={<AdminProductsPage />} />
+                      <Route path="banners" element={<AdminBannersPage />} />
+                      <Route path="splash" element={<AdminSplashPage />} />
+                      <Route path="videos" element={<AdminVideosPage />} />
+                      <Route path="navigation" element={<AdminNavigationPage />} />
+                      <Route path="draws" element={<AdminDrawsPage />} />
+                      <Route path="inventory" element={<AdminInventoryPage />} />
+                      <Route path="orders" element={<AdminOrdersPage />} />
+                      <Route path="deposits" element={<AdminDepositsPage />} />
+                      <Route path="ledger" element={<AdminLedgerPage />} />
+                      <Route path="transfers" element={<AdminTransfersPage />} />
+                      <Route path="payment-qr" element={<AdminPaymentQrPage />} />
+                      <Route path="customers" element={<AdminCustomersPage />} />
+                      <Route path="referrals" element={<AdminReferralsPage />} />
+                      <Route path="spin" element={<AdminSpinPage />} />
+                      <Route path="rewards" element={<AdminRewardsPage />} />
+                      <Route path="winners" element={<AdminWinnersPage />} />
+                      <Route path="announcements" element={<AdminAnnouncementsPage />} />
+                      <Route path="reports" element={<AdminReportsPage />} />
+                      <Route path="legal" element={<AdminLegalPage />} />
+                      <Route path="audit" element={<AdminAuditPage />} />
+                      <Route path="settings" element={<AdminSettingsPage />} />
+                    </Route>
                   </Route>
-                </Route>
 
-                <Route element={<PublicLayout />}>
-                  <Route path="*" element={<NotFoundPage />} />
-                </Route>
-              </Routes>
-            </Suspense>
+                  <Route element={<PublicLayout />}>
+                    <Route path="*" element={<NotFoundPage />} />
+                  </Route>
+                </Routes>
+              </Suspense>
+            </ErrorBoundary>
           </ToastProvider>
         </AuthProvider>
       </SettingsProvider>

@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { ErrorState } from "@/components/ui";
+import { isStaleBuildError, reloadForNewBuild } from "@/lib/staleBuild";
 
 interface Props {
   children: ReactNode;
@@ -19,16 +20,29 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    if (isStaleBuildError(error) && reloadForNewBuild()) return;
     console.error("[ErrorBoundary]", error, info.componentStack);
   }
 
   render() {
-    if (this.state.error) {
+    const { error } = this.state;
+    if (error && isStaleBuildError(error)) {
+      return (
+        <div className="page py-10">
+          <ErrorState
+            title="The site was just updated"
+            description="Tap Try again to open the latest version."
+            onRetry={() => window.location.reload()}
+          />
+        </div>
+      );
+    }
+    if (error) {
       return (
         <div className="page py-10">
           <ErrorState
             title={this.props.fallbackTitle ?? "This section could not be displayed"}
-            description={this.state.error.message}
+            description={error.message}
             onRetry={() => this.setState({ error: null })}
           />
         </div>

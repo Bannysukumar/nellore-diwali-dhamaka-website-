@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { SiteSettings, SiteVideo, SpinConfig, SplashConfig } from "@/types";
+import type { BottomNavSetting, SiteSettings, SiteVideo, SpinConfig, SplashConfig } from "@/types";
 import { store } from "@/lib/backend";
 
 interface SettingsContextValue {
@@ -16,6 +16,8 @@ interface SettingsContextValue {
   spin: SpinConfig | null;
   /** YouTube videos placed on public pages (`siteSettings/videos`). */
   videos: SiteVideo[];
+  /** Phone bottom-bar order chosen by an administrator (`siteSettings/navigation`), or null for the default. */
+  bottomNav: BottomNavSetting[] | null;
   loading: boolean;
   error: Error | null;
   reload: () => void;
@@ -55,6 +57,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [splash, setSplash] = useState<SplashConfig | null>(null);
   const [spin, setSpin] = useState<SpinConfig | null>(null);
   const [videos, setVideos] = useState<SiteVideo[]>([]);
+  const [bottomNav, setBottomNav] = useState<BottomNavSetting[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [nonce, setNonce] = useState(0);
@@ -74,6 +77,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setSpin((byId.spin as unknown as SpinConfig) ?? null);
         const videoItems = (byId.videos as { items?: unknown } | undefined)?.items;
         setVideos(Array.isArray(videoItems) ? (videoItems as SiteVideo[]) : []);
+        const navItems = (byId.navigation as { bottomNav?: unknown } | undefined)?.bottomNav;
+        setBottomNav(Array.isArray(navItems) ? (navItems as BottomNavSetting[]) : null);
         setError(null);
         setLoading(false);
         setFirstResolved(true);
@@ -88,8 +93,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [nonce]);
 
   const value = useMemo<SettingsContextValue>(
-    () => ({ settings, splash, spin, videos, loading, error, reload: () => setNonce((n) => n + 1) }),
-    [settings, splash, spin, videos, loading, error],
+    () => ({ settings, splash, spin, videos, bottomNav, loading, error, reload: () => setNonce((n) => n + 1) }),
+    [settings, splash, spin, videos, bottomNav, loading, error],
   );
 
   return (

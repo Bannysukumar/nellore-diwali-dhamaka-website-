@@ -3,7 +3,13 @@ import { createRoot } from "react-dom/client";
 import { App } from "@/app/App";
 import { CONFIG_PROBLEM } from "@/lib/firebase/config";
 import { renderConfigError } from "@/app/ConfigErrorScreen";
+import { reloadForNewBuild } from "@/lib/staleBuild";
 import "@/styles/index.css";
+
+/* Fired by Vite when a lazily loaded file from an older deploy is gone. */
+window.addEventListener("vite:preloadError", () => {
+  reloadForNewBuild();
+});
 
 const container = document.getElementById("root");
 if (!container) throw new Error("Root container #root is missing from index.html");

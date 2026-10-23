@@ -504,6 +504,14 @@ export interface PerformanceSettings {
   updatedAt?: ISODate;
 }
 
+export type BottomNavKey = "spin" | "home" | "draws" | "book" | "wallet" | "account";
+
+/** One slot of the phone bottom bar, in the order an administrator chose (`siteSettings/navigation`). */
+export interface BottomNavSetting {
+  key: BottomNavKey;
+  visible: boolean;
+}
+
 export interface SplashConfig {
   enabled: boolean;
   desktopBannerUrl?: string;

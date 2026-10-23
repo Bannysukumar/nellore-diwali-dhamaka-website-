@@ -5,6 +5,7 @@ import type {
   PerformanceSettings,
   SiteSettings,
   SiteVideo,
+  BottomNavSetting,
   SplashConfig,
   TicketPackage,
   WinnerAnnouncement,
@@ -88,6 +89,13 @@ export const contentService = {
   async saveVideos(items: SiteVideo[]) {
     await store.set("siteSettings", "videos", {
       items: items.map((item, index) => ({ ...item, sortOrder: index })),
+      updatedAt: new Date().toISOString(),
+    });
+  },
+
+  async saveBottomNav(items: BottomNavSetting[]) {
+    await store.set("siteSettings", "navigation", {
+      bottomNav: items.map(({ key, visible }) => ({ key, visible })),
       updatedAt: new Date().toISOString(),
     });
   },
